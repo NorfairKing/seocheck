@@ -13,6 +13,7 @@ library:
   dependencies:
     - aeson
     - bytestring
+    - case-insensitive
     - conduit
     - containers
     - envparse

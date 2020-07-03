@@ -15,6 +15,7 @@ import Control.Monad.Logger
 import qualified Data.ByteString as SB
 import qualified Data.ByteString.Char8 as SB8
 import qualified Data.ByteString.Lazy as LB
+import qualified Data.CaseInsensitive as CI
 import Data.Foldable
 import Data.IntMap (IntMap)
 import qualified Data.IntMap.Strict as IM
@@ -29,6 +30,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import Data.Validity
+import Debug.Trace
 import Network.HTTP.Client as HTTP
 import Network.HTTP.Client.TLS as HTTP
 import Network.HTTP.Types as HTTP
@@ -99,7 +101,11 @@ renderStatusResult s =
 
 renderDocResult :: DocResult -> [Chunk Text]
 renderDocResult DocResult {..} =
-  [ case docResultTitle of
+  [ case docResultDocType of
+      HtmlDocType -> fore green $ chunk "html"
+      UnknownDocType -> fore red $ chunk "Unknown doctype"
+      NoDocType -> fore red $ chunk "No doctype",
+    case docResultTitle of
       NoTitleFound -> fore red $ chunk "No title"
       EmptyTitle -> fore red $ chunk "Empty title"
       NonStandardTitle e -> fore red $ chunk $ T.pack $ "Non-standard title" <> show e
@@ -200,7 +206,7 @@ produceResult man root link =
                   A -> do
                     ct <- contentType
                     if "text/html" `SB.isInfixOf` ct
-                      then Just $ produceDocResult root $ HTML.parseLBS body
+                      then Just $ produceDocResult root resp $ HTML.parseLBS body
                       else Nothing
                   _ -> Nothing
               }
@@ -208,6 +214,7 @@ produceResult man root link =
 data DocResult
   = DocResult
       { docResultLinks :: ![Link],
+        docResultDocType :: !DocTypeResult,
         docResultTitle :: !TitleResult
       }
   deriving (Show, Eq)
@@ -215,15 +222,20 @@ data DocResult
 docResultValidation :: DocResult -> Validation
 docResultValidation DocResult {..} =
   mconcat
-    [ declare "There was exactly one title" $ case docResultTitle of
+    [ declare "There was a doctype" $ case docResultDocType of
+        HtmlDocType -> True
+        NoDocType -> False
+        UnknownDocType -> False,
+      declare "There was exactly one title" $ case docResultTitle of
         TitleFound _ -> True
         _ -> False
     ]
 
-produceDocResult :: URI -> XML.Document -> DocResult
-produceDocResult root d =
+produceDocResult :: URI -> Response LB.ByteString -> XML.Document -> DocResult
+produceDocResult root resp d =
   DocResult
     { docResultLinks = documentLinks root d,
+      docResultDocType = documentDocType resp,
       docResultTitle = documentTitle d
     }
 
@@ -262,6 +274,18 @@ parseURIRelativeTo root s =
     [ (`relativeTo` root) <$> parseRelativeReference s,
       parseAbsoluteURI s
     ]
+
+data DocTypeResult = HtmlDocType | NoDocType | UnknownDocType
+  deriving (Show, Eq)
+
+documentDocType :: Response LB.ByteString -> DocTypeResult
+documentDocType resp =
+  if CI.mk (LB.take (fromIntegral $ SB.length "<!DOCTYPE ") (responseBody resp)) == CI.mk "<!DOCTYPE "
+    then
+      if CI.mk (LB.take (fromIntegral $ SB.length "<!DOCTYPE html>") (responseBody resp)) == CI.mk "<!DOCTYPE html>"
+        then HtmlDocType
+        else UnknownDocType
+    else NoDocType
 
 data TitleResult
   = NoTitleFound

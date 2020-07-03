@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f9cf0393aff44cd61886595820a500e73454a1ecdec7da234f7044da9c1b217a
+-- hash: 5abf9a1119f5566166ae57f92141f73a6cca321812d186afd5a96c845b6c66be
 
 name:           seocheck
 version:        0.0.0.0
@@ -32,6 +32,7 @@ library
       aeson
     , base >=4.7 && <5
     , bytestring
+    , case-insensitive
     , conduit
     , containers
     , envparse
