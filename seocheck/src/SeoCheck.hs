@@ -68,49 +68,55 @@ newtype SEOResult
   deriving (Show, Eq)
 
 renderSEOResult :: SEOResult -> [[Chunk Text]]
-renderSEOResult SEOResult {..} = mapMaybe (uncurry renderPageResult) (M.toList seoResultPageResults)
+renderSEOResult SEOResult {..} = concat $ mapMaybe (uncurry renderPageResult) (M.toList seoResultPageResults)
 
-renderPageResult :: Link -> Result -> Maybe [Chunk Text]
+renderPageResult :: Link -> Result -> Maybe [[Chunk Text]]
 renderPageResult link r@Result {..} =
   if resultBad r
     then Just go
     else Nothing
   where
-    go :: [Chunk Text]
+    go :: [[Chunk Text]]
     go =
-      intersperse
-        (chunk " ")
-        $ concat
-          [ [chunk $ T.pack $ show (linkUri link)],
-            renderStatusResult resultStatus,
-            maybe [] renderDocResult resultDocResult,
-            [chunk "\n"]
-          ]
+      intersperse [chunk "\n"] $
+        [ [fore blue $ chunk $ T.pack $ show (linkUri link)],
+          renderStatusResult resultStatus
+        ]
+          ++ maybe [] renderDocResult resultDocResult
 
 renderStatusResult :: HTTP.Status -> [Chunk Text]
 renderStatusResult s =
-  [fore col $ chunk $ T.pack $ show sci]
+  [ chunk "Status: ",
+    fore col $ chunk $ T.pack $ show sci
+  ]
   where
     sci = HTTP.statusCode s
     col = if 200 <= sci && sci < 300 then green else red
 
-renderDocResult :: DocResult -> [Chunk Text]
+renderDocResult :: DocResult -> [[Chunk Text]]
 renderDocResult DocResult {..} =
-  [ case docResultDocType of
-      HtmlDocType -> fore green $ chunk "html"
-      UnknownDocType -> fore red $ chunk "Unknown doctype"
-      NoDocType -> fore red $ chunk "No doctype",
-    case docResultTitle of
-      NoTitleFound -> fore red $ chunk "No title"
-      EmptyTitle -> fore red $ chunk "Empty title"
-      NonStandardTitle e -> fore red $ chunk $ T.pack $ "Non-standard title: " <> show e
-      TitleFound t -> fore green $ chunk t,
-    case docResultDescription of
-      Description d -> fore green $ chunk d
-      EmptyDescription -> fore red $ chunk "Empty description"
-      NoDescription -> fore red $ chunk "No description"
-      MultipleDescriptions -> fore red $ chunk "Multiple descriptions"
-      NonStandardDescription e -> fore red $ chunk $ T.pack $ "Non-standard description: " <> show e
+  [ [ chunk "Doctype: ",
+      case docResultDocType of
+        HtmlDocType -> fore green $ chunk "html"
+        UnknownDocType -> fore red $ chunk "Unknown doctype"
+        NoDocType -> fore red $ chunk "No doctype"
+    ],
+    [ chunk "Title: ",
+      case docResultTitle of
+        NoTitleFound -> fore red $ chunk "No title"
+        EmptyTitle -> fore red $ chunk "Empty title"
+        NonStandardTitle e -> fore red $ chunk $ T.pack $ "Non-standard title: " <> show e
+        TitleFound t -> fore green $ chunk t
+    ],
+    [ chunk "Description: ",
+      case docResultDescription of
+        Description d -> fore green $ chunk d
+        EmptyDescription -> fore red $ chunk "Empty description"
+        NoDescription -> fore red $ chunk "No description"
+        MultipleDescriptions -> fore red $ chunk "Multiple descriptions"
+        NonStandardDescription e -> fore red $ chunk $ T.pack $ "Non-standard description: " <> show e
+    ],
+    [chunk "\n"] -- Empty line
   ]
 
 worker :: URI -> HTTP.Manager -> TQueue Link -> TVar (Set Link) -> TVar (Map Link Result) -> TVar (IntMap Bool) -> Int -> LoggingT IO ()
