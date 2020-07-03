@@ -191,11 +191,17 @@ produceResult man root link =
           logDebugN $ "Got response for " <> T.pack (show uri) <> ": " <> T.pack (show sci)
           -- If the status code is not in the 2XX range, add it to the results
           let body = responseBody resp
+          let headers = responseHeaders resp
+              contentType = lookup hContentType headers
           pure $ Just $
             Result
               { resultStatus = responseStatus resp,
                 resultDocResult = case linkType link of
-                  A -> Just $ produceDocResult root $ HTML.parseLBS body
+                  A -> do
+                    ct <- contentType
+                    if "text/html" `SB.isInfixOf` ct
+                      then Just $ produceDocResult root $ HTML.parseLBS body
+                      else Nothing
                   _ -> Nothing
               }
 
