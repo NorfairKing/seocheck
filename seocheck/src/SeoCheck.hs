@@ -13,10 +13,8 @@ import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Logger
 import qualified Data.ByteString as SB
-import qualified Data.ByteString.Char8 as SB8
 import qualified Data.ByteString.Lazy as LB
 import qualified Data.CaseInsensitive as CI
-import Data.Foldable
 import Data.IntMap (IntMap)
 import qualified Data.IntMap.Strict as IM
 import Data.List
@@ -25,12 +23,9 @@ import Data.Map (Map)
 import Data.Maybe
 import qualified Data.Set as S
 import Data.Set (Set)
-import Data.String
 import Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Text.Encoding as TE
 import Data.Validity
-import Debug.Trace
 import Network.HTTP.Client as HTTP
 import Network.HTTP.Client.TLS as HTTP
 import Network.HTTP.Types as HTTP
@@ -41,7 +36,7 @@ import System.Exit
 import Text.HTML.DOM as HTML
 import Text.XML (Document (..))
 import Text.XML as XML
-import UnliftIO
+import UnliftIO hiding (link)
 
 seoCheck :: IO ()
 seoCheck = do
@@ -108,8 +103,14 @@ renderDocResult DocResult {..} =
     case docResultTitle of
       NoTitleFound -> fore red $ chunk "No title"
       EmptyTitle -> fore red $ chunk "Empty title"
-      NonStandardTitle e -> fore red $ chunk $ T.pack $ "Non-standard title" <> show e
-      TitleFound t -> fore green $ chunk t
+      NonStandardTitle e -> fore red $ chunk $ T.pack $ "Non-standard title: " <> show e
+      TitleFound t -> fore green $ chunk t,
+    case docResultDescription of
+      Description d -> fore green $ chunk d
+      EmptyDescription -> fore red $ chunk "Empty description"
+      NoDescription -> fore red $ chunk "No description"
+      MultipleDescriptions -> fore red $ chunk "Multiple descriptions"
+      NonStandardDescription e -> fore red $ chunk $ T.pack $ "Non-standard description: " <> show e
   ]
 
 worker :: URI -> HTTP.Manager -> TQueue Link -> TVar (Set Link) -> TVar (Map Link Result) -> TVar (IntMap Bool) -> Int -> LoggingT IO ()
@@ -215,7 +216,8 @@ data DocResult
   = DocResult
       { docResultLinks :: ![Link],
         docResultDocType :: !DocTypeResult,
-        docResultTitle :: !TitleResult
+        docResultTitle :: !TitleResult,
+        docResultDescription :: !DescriptionResult
       }
   deriving (Show, Eq)
 
@@ -228,6 +230,9 @@ docResultValidation DocResult {..} =
         UnknownDocType -> False,
       declare "There was exactly one title" $ case docResultTitle of
         TitleFound _ -> True
+        _ -> False,
+      declare "There was exactly one description" $ case docResultDescription of
+        Description _ -> True
         _ -> False
     ]
 
@@ -236,7 +241,8 @@ produceDocResult root resp d =
   DocResult
     { docResultLinks = documentLinks root d,
       docResultDocType = documentDocType resp,
-      docResultTitle = documentTitle d
+      docResultTitle = documentTitle d,
+      docResultDescription = documentDescription d
     }
 
 documentLinks :: URI -> Document -> [Link]
@@ -302,6 +308,28 @@ documentTitle d = case findDocumentTag (== "head") d >>= findElementTag (== "tit
     [NodeContent t] -> TitleFound t
     _ -> NonStandardTitle e
 
+data DescriptionResult
+  = NoDescription
+  | EmptyDescription
+  | MultipleDescriptions
+  | Description Text
+  | NonStandardDescription Element
+  deriving (Show, Eq)
+
+documentDescription :: Document -> DescriptionResult
+documentDescription d =
+  case findDocumentTag (== "head") d of
+    Nothing -> NoDescription
+    Just headTag ->
+      let metaTags = findElementTags (== "meta") headTag
+          isMetaDescription e = M.lookup "name" (elementAttributes e) == Just "description"
+       in case filter isMetaDescription metaTags of
+            [] -> NoDescription
+            [e] -> case elementNodes e of
+              [] -> maybe EmptyDescription Description $ M.lookup "content" (elementAttributes e)
+              _ -> NonStandardDescription e
+            _ -> MultipleDescriptions
+
 findDocumentTag :: (Name -> Bool) -> Document -> Maybe Element
 findDocumentTag p = findElementTag p . documentRoot
 
@@ -316,3 +344,16 @@ findElementTag p e@Element {..} =
     goNode = \case
       NodeElement e' -> findElementTag p e'
       _ -> Nothing
+
+-- findDocumentTags :: (Name -> Bool) -> Document -> [Element]
+-- findDocumentTags p = findElementTags p . documentRoot
+
+findElementTags :: (Name -> Bool) -> Element -> [Element]
+findElementTags p e@Element {..} =
+  go (concatMap goNode elementNodes)
+  where
+    go = if p elementName then (e :) else id
+    goNode :: Node -> [Element]
+    goNode = \case
+      NodeElement e' -> findElementTags p e'
+      _ -> []
