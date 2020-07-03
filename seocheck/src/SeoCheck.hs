@@ -12,10 +12,13 @@ import Control.Concurrent
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Logger
+import qualified Data.ByteString as SB
+import qualified Data.ByteString.Char8 as SB8
 import qualified Data.ByteString.Lazy as LB
 import Data.Foldable
 import Data.IntMap (IntMap)
 import qualified Data.IntMap.Strict as IM
+import Data.List
 import qualified Data.Map as M
 import Data.Map (Map)
 import Data.Maybe
@@ -30,6 +33,7 @@ import Network.HTTP.Client as HTTP
 import Network.HTTP.Client.TLS as HTTP
 import Network.HTTP.Types as HTTP
 import Network.URI
+import Rainbow
 import SeoCheck.OptParse
 import System.Exit
 import Text.HTML.DOM as HTML
@@ -53,30 +57,54 @@ seoCheck = do
     forConcurrently_ indexes $ \ix ->
       worker setUri man queue seen results fetcherStati ix
   resultsMap <- readTVarIO results
-  ( if any resultBad resultsMap
-      then die
-      else putStrLn
-    )
-    $ showResults resultsMap
+  bytestringMaker <- byteStringMakerFromEnvironment
+  mapM_ (mapM_ SB.putStr . chunksToByteStrings bytestringMaker) $ renderSEOResult $ SEOResult {seoResultPageResults = resultsMap}
+  exitWith $
+    if any resultBad resultsMap
+      then ExitFailure 1
+      else ExitSuccess
 
-showResults :: Map Link Result -> String
-showResults m =
-  unlines
-    $ map (uncurry showResult)
-    $ M.toList m
+newtype SEOResult
+  = SEOResult
+      { seoResultPageResults :: Map Link Result
+      }
+  deriving (Show, Eq)
 
-showResult :: Link -> Result -> String
-showResult uri res =
-  unwords
-    [ show (linkUri uri) <> ":",
-      show (HTTP.statusCode $ resultStatus res),
-      case resultDocResult res of
-        Nothing -> ""
-        Just DocResult {..} -> case docResultTitle of
-          NoTitleFound -> "No title"
-          NonStandardTitle -> "Non-standard title"
-          TitleFound t -> T.unpack t
-    ]
+renderSEOResult :: SEOResult -> [[Chunk Text]]
+renderSEOResult SEOResult {..} = mapMaybe (uncurry renderPageResult) (M.toList seoResultPageResults)
+
+renderPageResult :: Link -> Result -> Maybe [Chunk Text]
+renderPageResult link r@Result {..} =
+  if resultBad r
+    then Just go
+    else Nothing
+  where
+    go :: [Chunk Text]
+    go =
+      intersperse
+        (chunk " ")
+        $ concat
+          [ [chunk $ T.pack $ show (linkUri link)],
+            renderStatusResult resultStatus,
+            maybe [] renderDocResult resultDocResult,
+            [chunk "\n"]
+          ]
+
+renderStatusResult :: HTTP.Status -> [Chunk Text]
+renderStatusResult s =
+  [fore col $ chunk $ T.pack $ show sci]
+  where
+    sci = HTTP.statusCode s
+    col = if 200 <= sci && sci < 300 then green else red
+
+renderDocResult :: DocResult -> [Chunk Text]
+renderDocResult DocResult {..} =
+  [ case docResultTitle of
+      NoTitleFound -> fore red $ chunk "No title"
+      EmptyTitle -> fore red $ chunk "Empty title"
+      NonStandardTitle e -> fore red $ chunk $ T.pack $ "Non-standard title" <> show e
+      TitleFound t -> fore green $ chunk t
+  ]
 
 worker :: URI -> HTTP.Manager -> TQueue Link -> TVar (Set Link) -> TVar (Map Link Result) -> TVar (IntMap Bool) -> Int -> LoggingT IO ()
 worker root man queue seen results stati index = go True
@@ -231,16 +259,18 @@ parseURIRelativeTo root s =
 
 data TitleResult
   = NoTitleFound
+  | EmptyTitle
   | TitleFound Text
-  | NonStandardTitle
+  | NonStandardTitle Element
   deriving (Show, Eq)
 
 documentTitle :: Document -> TitleResult
 documentTitle d = case findDocumentTag (== "head") d >>= findElementTag (== "title") of
   Nothing -> NoTitleFound
-  Just Element {..} -> case elementNodes of
+  Just e@Element {..} -> case elementNodes of
+    [] -> EmptyTitle
     [NodeContent t] -> TitleFound t
-    _ -> NonStandardTitle
+    _ -> NonStandardTitle e
 
 findDocumentTag :: (Name -> Bool) -> Document -> Maybe Element
 findDocumentTag p = findElementTag p . documentRoot

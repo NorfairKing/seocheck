@@ -28,7 +28,7 @@ getConfig _ _ = pure Nothing
 deriveSettings :: Flags -> Environment -> Maybe Configuration -> IO Settings
 deriveSettings Flags {..} Environment _ = do
   let setUri = flagUri
-      setLogLevel = fromMaybe LevelInfo flagLogLevel
+      setLogLevel = fromMaybe LevelWarn flagLogLevel
       setFetchers = flagFetchers
   pure Settings {..}
 

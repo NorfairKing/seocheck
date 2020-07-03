@@ -16,6 +16,7 @@ library:
     - conduit
     - containers
     - envparse
+    - html-conduit
     - http-client
     - http-client-tls
     - http-types
@@ -24,13 +25,13 @@ library:
     - optparse-applicative
     - path
     - path-io
+    - rainbow
     - stm
     - text
     - unliftio
     - unliftio
     - validity
     - xml-conduit
-    - html-conduit
     - yamlparse-applicative
 
 executables:

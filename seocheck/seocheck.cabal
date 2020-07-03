@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 12eb0d8fb58d4388fe7b899fcbed3153357791f447f477be06be7f1e3e2dc05f
+-- hash: f9cf0393aff44cd61886595820a500e73454a1ecdec7da234f7044da9c1b217a
 
 name:           seocheck
 version:        0.0.0.0
@@ -44,6 +44,7 @@ library
     , optparse-applicative
     , path
     , path-io
+    , rainbow
     , stm
     , text
     , unliftio
