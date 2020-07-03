@@ -25,7 +25,6 @@ library:
     - path
     - path-io
     - stm
-    - tagsoup
     - text
     - unliftio
     - unliftio

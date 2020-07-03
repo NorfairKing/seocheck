@@ -7,6 +7,7 @@ module SeoCheck
   )
 where
 
+import Control.Applicative
 import Control.Concurrent
 import Control.Monad
 import Control.Monad.IO.Class
@@ -32,7 +33,6 @@ import Network.URI
 import SeoCheck.OptParse
 import System.Exit
 import Text.HTML.DOM as HTML
-import Text.HTML.TagSoup
 import Text.XML (Document (..))
 import Text.XML as XML
 import UnliftIO
@@ -69,7 +69,13 @@ showResult :: Link -> Result -> String
 showResult uri res =
   unwords
     [ show (linkUri uri) <> ":",
-      show (HTTP.statusCode $ resultStatus res)
+      show (HTTP.statusCode $ resultStatus res),
+      case resultDocResult res of
+        Nothing -> ""
+        Just DocResult {..} -> case docResultTitle of
+          NoTitleFound -> "No title"
+          NonStandardTitle -> "Non-standard title"
+          TitleFound t -> T.unpack t
     ]
 
 worker :: URI -> HTTP.Manager -> TQueue Link -> TVar (Set Link) -> TVar (Map Link Result) -> TVar (IntMap Bool) -> Int -> LoggingT IO ()
@@ -117,6 +123,12 @@ worker root man queue seen results stati index = go True
           -- Filter out the ones that are not on the same host.
           go True
 
+data Link = Link {linkType :: LinkType, linkUri :: URI}
+  deriving (Show, Eq, Ord)
+
+data LinkType = A | IMG | LINK
+  deriving (Show, Eq, Ord)
+
 data Result
   = Result
       { resultStatus :: HTTP.Status,
@@ -130,7 +142,8 @@ resultBad Result {..} =
     mconcat
       [ declare "The status code is in the 200 range" $
           let sci = HTTP.statusCode resultStatus
-           in 200 <= sci && sci < 300
+           in 200 <= sci && sci < 300,
+        decorate "Doc result" $ maybe valid docResultValidation resultDocResult
       ]
 
 produceResult :: HTTP.Manager -> URI -> Link -> LoggingT IO (Maybe Result)
@@ -158,23 +171,27 @@ produceResult man root link =
                   _ -> Nothing
               }
 
-newtype DocResult
+data DocResult
   = DocResult
-      { docResultLinks :: [Link]
+      { docResultLinks :: ![Link],
+        docResultTitle :: !TitleResult
       }
   deriving (Show, Eq)
+
+docResultValidation :: DocResult -> Validation
+docResultValidation DocResult {..} =
+  mconcat
+    [ declare "There was exactly one title" $ case docResultTitle of
+        TitleFound _ -> True
+        _ -> False
+    ]
 
 produceDocResult :: URI -> XML.Document -> DocResult
 produceDocResult root d =
   DocResult
-    { docResultLinks = documentLinks root d
+    { docResultLinks = documentLinks root d,
+      docResultTitle = documentTitle d
     }
-
-data Link = Link {linkType :: LinkType, linkUri :: URI}
-  deriving (Show, Eq, Ord)
-
-data LinkType = A | IMG | LINK
-  deriving (Show, Eq, Ord)
 
 documentLinks :: URI -> Document -> [Link]
 documentLinks root = elementLinks root . documentRoot
@@ -212,14 +229,30 @@ parseURIRelativeTo root s =
       parseAbsoluteURI s
     ]
 
-rightToMaybe :: Either e a -> Maybe a
-rightToMaybe = \case
-  Left _ -> Nothing
-  Right a -> Just a
+data TitleResult
+  = NoTitleFound
+  | TitleFound Text
+  | NonStandardTitle
+  deriving (Show, Eq)
 
-aTagHref :: (Eq str, IsString str) => Tag str -> Maybe str
-aTagHref = \case
-  TagOpen "a" as -> lookup "href" as
-  TagOpen "link" as -> lookup "href" as
-  TagOpen "img" as -> lookup "src" as
-  _ -> Nothing
+documentTitle :: Document -> TitleResult
+documentTitle d = case findDocumentTag (== "head") d >>= findElementTag (== "title") of
+  Nothing -> NoTitleFound
+  Just Element {..} -> case elementNodes of
+    [NodeContent t] -> TitleFound t
+    _ -> NonStandardTitle
+
+findDocumentTag :: (Name -> Bool) -> Document -> Maybe Element
+findDocumentTag p = findElementTag p . documentRoot
+
+findElementTag :: (Name -> Bool) -> Element -> Maybe Element
+findElementTag p e@Element {..} =
+  go <|> msum (map goNode elementNodes)
+  where
+    go = do
+      guard (p elementName)
+      pure e
+    goNode :: Node -> Maybe Element
+    goNode = \case
+      NodeElement e' -> findElementTag p e'
+      _ -> Nothing

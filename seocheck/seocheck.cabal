@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: d2a8b52f8b623c03e67720642fb7c645bc410d042a7d9a4ec9d244f2603b5738
+-- hash: 12eb0d8fb58d4388fe7b899fcbed3153357791f447f477be06be7f1e3e2dc05f
 
 name:           seocheck
 version:        0.0.0.0
@@ -45,7 +45,6 @@ library
     , path
     , path-io
     , stm
-    , tagsoup
     , text
     , unliftio
     , validity
