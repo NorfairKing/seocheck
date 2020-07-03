@@ -1,0 +1,4 @@
+.stack-work/
+*~
+result*
+.pre-commit-config.yaml

@@ -1,0 +1,79 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.33.0.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: d2a8b52f8b623c03e67720642fb7c645bc410d042a7d9a4ec9d244f2603b5738
+
+name:           seocheck
+version:        0.0.0.0
+homepage:       https://github.com/NorfairKing/seocheck#readme
+bug-reports:    https://github.com/NorfairKing/seocheck/issues
+author:         Tom Sydney Kerckhove
+maintainer:     syd@cs-syd.eu
+copyright:      Copyright (c) 2020 Tom Sydney Kerckhove
+build-type:     Simple
+
+source-repository head
+  type: git
+  location: https://github.com/NorfairKing/seocheck
+
+library
+  exposed-modules:
+      SeoCheck
+      SeoCheck.OptParse
+      SeoCheck.OptParse.Types
+  other-modules:
+      Paths_seocheck
+  hs-source-dirs:
+      src
+  build-depends:
+      aeson
+    , base >=4.7 && <5
+    , bytestring
+    , conduit
+    , containers
+    , envparse
+    , html-conduit
+    , http-client
+    , http-client-tls
+    , http-types
+    , monad-logger
+    , network-uri
+    , optparse-applicative
+    , path
+    , path-io
+    , stm
+    , tagsoup
+    , text
+    , unliftio
+    , validity
+    , xml-conduit
+    , yamlparse-applicative
+  default-language: Haskell2010
+
+executable seocheck
+  main-is: Main.hs
+  other-modules:
+      Paths_seocheck
+  hs-source-dirs:
+      app
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , seocheck
+  default-language: Haskell2010
+
+test-suite seocheck-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_seocheck
+  hs-source-dirs:
+      test
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , seocheck
+  default-language: Haskell2010
