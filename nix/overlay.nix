@@ -2,9 +2,9 @@ final: previous:
 with final.haskell.lib;
 
 {
-  linkCheckPackages =
+  seoCheckPackages =
     let
-      linkCheckPkg =
+      seoCheckPkg =
         name:
           doBenchmark (
             addBuildDepend (
@@ -15,13 +15,13 @@ with final.haskell.lib;
               )
             ) (final.haskellPackages.autoexporter)
           );
-      linkCheckPkgWithComp =
+      seoCheckPkgWithComp =
         exeName: name:
-          generateOptparseApplicativeCompletion exeName (linkCheckPkg name);
-      linkCheckPkgWithOwnComp = name: linkCheckPkgWithComp name name;
+          generateOptparseApplicativeCompletion exeName (seoCheckPkg name);
+      seoCheckPkgWithOwnComp = name: seoCheckPkgWithComp name name;
     in
       {
-        "linkcheck" = linkCheckPkgWithOwnComp "linkcheck";
+        "seocheck" = seoCheckPkgWithOwnComp "seocheck";
       };
   haskellPackages =
     previous.haskellPackages.override (
@@ -36,7 +36,7 @@ with final.haskell.lib;
               )
             ) (
               self: super:
-                final.linkCheckPackages
+                final.seoCheckPackages
             );
         }
     );
