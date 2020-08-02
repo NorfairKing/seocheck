@@ -1,6 +1,6 @@
-# Link check
+# SEO check
 
-A fast seo checker for CI.
+A seo checker for CI.
 
 This is designed to be run on CI to make sure that you do not have bad SEO manners before you deploy
 
