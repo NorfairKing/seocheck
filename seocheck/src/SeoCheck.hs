@@ -116,6 +116,11 @@ renderDocResult DocResult {..} =
         MultipleDescriptions -> fore red $ chunk "Multiple descriptions"
         NonStandardDescription e -> fore red $ chunk $ T.pack $ "Non-standard description: " <> show e
     ],
+    [ chunk "Images without Alt: ",
+      case S.toList docResultImagesWithoutAlt of
+        [] -> fore green $ chunk "None"
+        is -> fore red $ chunk $ T.pack $ show is
+    ],
     [chunk "\n"] -- Empty line
   ]
 
@@ -223,7 +228,8 @@ data DocResult
       { docResultLinks :: ![Link],
         docResultDocType :: !DocTypeResult,
         docResultTitle :: !TitleResult,
-        docResultDescription :: !DescriptionResult
+        docResultDescription :: !DescriptionResult,
+        docResultImagesWithoutAlt :: !(Set Text) -- The 'src' tags of those images
       }
   deriving (Show, Eq)
 
@@ -237,9 +243,11 @@ docResultValidation DocResult {..} =
       declare "There was exactly one title" $ case docResultTitle of
         TitleFound _ -> True
         _ -> False,
-      declare "There was exactly one description" $ case docResultDescription of
-        Description _ -> True
-        _ -> False
+      declare "There was exactly one description" $
+        case docResultDescription of
+          Description _ -> True
+          _ -> False,
+      declare "There are no pages without alt tags" $ S.null docResultImagesWithoutAlt
     ]
 
 produceDocResult :: URI -> Response LB.ByteString -> XML.Document -> DocResult
@@ -248,7 +256,8 @@ produceDocResult root resp d =
     { docResultLinks = documentLinks root d,
       docResultDocType = documentDocType resp,
       docResultTitle = documentTitle d,
-      docResultDescription = documentDescription d
+      docResultDescription = documentDescription d,
+      docResultImagesWithoutAlt = documentImagesWithoutAlt d
     }
 
 documentLinks :: URI -> Document -> [Link]
@@ -339,6 +348,13 @@ documentDescription d =
 findDocumentTag :: (Name -> Bool) -> Document -> Maybe Element
 findDocumentTag p = findElementTag p . documentRoot
 
+documentImagesWithoutAlt :: Document -> Set Text
+documentImagesWithoutAlt d = S.fromList $ flip mapMaybe (findDocumentTags (== "img") d) $ \e -> do
+  src <- M.lookup "src" (elementAttributes e) -- We skip the ones without a 'src' attribute because we cannot identify them.
+  case M.lookup "alt" (elementAttributes e) of
+    Nothing -> Just src
+    Just _ -> Nothing
+
 findElementTag :: (Name -> Bool) -> Element -> Maybe Element
 findElementTag p e@Element {..} =
   go <|> msum (map goNode elementNodes)
@@ -351,8 +367,8 @@ findElementTag p e@Element {..} =
       NodeElement e' -> findElementTag p e'
       _ -> Nothing
 
--- findDocumentTags :: (Name -> Bool) -> Document -> [Element]
--- findDocumentTags p = findElementTags p . documentRoot
+findDocumentTags :: (Name -> Bool) -> Document -> [Element]
+findDocumentTags p = findElementTags p . documentRoot
 
 findElementTags :: (Name -> Bool) -> Element -> [Element]
 findElementTags p e@Element {..} =
