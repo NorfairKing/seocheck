@@ -353,7 +353,8 @@ documentImagesWithoutAlt d = S.fromList $ flip mapMaybe (findDocumentTags (== "i
   src <- M.lookup "src" (elementAttributes e) -- We skip the ones without a 'src' attribute because we cannot identify them.
   case M.lookup "alt" (elementAttributes e) of
     Nothing -> Just src
-    Just _ -> Nothing
+    Just "" -> Just src
+    Just a -> if T.null (T.strip a) then Just src else Nothing
 
 findElementTag :: (Name -> Bool) -> Element -> Maybe Element
 findElementTag p e@Element {..} =
