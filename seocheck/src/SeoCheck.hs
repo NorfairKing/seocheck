@@ -18,11 +18,11 @@ import qualified Data.CaseInsensitive as CI
 import Data.IntMap (IntMap)
 import qualified Data.IntMap.Strict as IM
 import Data.List
-import qualified Data.Map as M
 import Data.Map (Map)
+import qualified Data.Map as M
 import Data.Maybe
-import qualified Data.Set as S
 import Data.Set (Set)
+import qualified Data.Set as S
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Validity
@@ -34,7 +34,6 @@ import Rainbow
 import SeoCheck.OptParse
 import System.Exit
 import Text.HTML.DOM as HTML
-import Text.XML (Document (..))
 import Text.XML as XML
 import UnliftIO hiding (link)
 
@@ -49,10 +48,12 @@ seoCheck = do
       indexes = [0 .. fetchers - 1]
   fetcherStati <- newTVarIO $ IM.fromList $ zip indexes (repeat True)
   atomically $ writeTQueue queue (Link A setUri)
-  runStderrLoggingT $ filterLogger (\_ ll -> ll >= setLogLevel) $ do
-    logInfoN $ "Running with " <> T.pack (show fetchers) <> " fetchers"
-    forConcurrently_ indexes $ \ix ->
-      worker setUri man queue seen results fetcherStati ix
+  runStderrLoggingT
+    $ filterLogger (\_ ll -> ll >= setLogLevel)
+    $ do
+      logInfoN $ "Running with " <> T.pack (show fetchers) <> " fetchers"
+      forConcurrently_ indexes $ \ix ->
+        worker setUri man queue seen results fetcherStati ix
   resultsMap <- readTVarIO results
   bytestringMaker <- byteStringMakerFromEnvironment
   mapM_ (mapM_ SB.putStr . chunksToByteStrings bytestringMaker) $ renderSEOResult $ SEOResult {seoResultPageResults = resultsMap}
@@ -67,16 +68,16 @@ newtype SEOResult
       }
   deriving (Show, Eq)
 
-renderSEOResult :: SEOResult -> [[Chunk Text]]
+renderSEOResult :: SEOResult -> [[Chunk]]
 renderSEOResult SEOResult {..} = concat $ mapMaybe (uncurry renderPageResult) (M.toList seoResultPageResults)
 
-renderPageResult :: Link -> Result -> Maybe [[Chunk Text]]
+renderPageResult :: Link -> Result -> Maybe [[Chunk]]
 renderPageResult link r@Result {..} =
   if resultBad r
     then Just go
     else Nothing
   where
-    go :: [[Chunk Text]]
+    go :: [[Chunk]]
     go =
       intersperse [chunk "\n"] $
         [ [fore blue $ chunk $ T.pack $ show (linkUri link)],
@@ -84,7 +85,7 @@ renderPageResult link r@Result {..} =
         ]
           ++ maybe [] renderDocResult resultDocResult
 
-renderStatusResult :: HTTP.Status -> [Chunk Text]
+renderStatusResult :: HTTP.Status -> [Chunk]
 renderStatusResult s =
   [ chunk "Status: ",
     fore col $ chunk $ T.pack $ show sci
@@ -93,7 +94,7 @@ renderStatusResult s =
     sci = HTTP.statusCode s
     col = if 200 <= sci && sci < 300 then green else red
 
-renderDocResult :: DocResult -> [[Chunk Text]]
+renderDocResult :: DocResult -> [[Chunk]]
 renderDocResult DocResult {..} =
   [ [ chunk "Doctype: ",
       case docResultDocType of
@@ -184,8 +185,9 @@ data Result
 
 resultBad :: Result -> Bool
 resultBad Result {..} =
-  not $ validationIsValid $
-    mconcat
+  not
+    $ validationIsValid
+    $ mconcat
       [ declare "The status code is in the 200 range" $
           let sci = HTTP.statusCode resultStatus
            in 200 <= sci && sci < 300,
@@ -211,8 +213,9 @@ produceResult man root link =
           let body = responseBody resp
           let headers = responseHeaders resp
               contentType = lookup hContentType headers
-          pure $ Just $
-            Result
+          pure
+            $ Just
+            $ Result
               { resultStatus = responseStatus resp,
                 resultDocResult = case linkType link of
                   A -> do
@@ -349,12 +352,14 @@ findDocumentTag :: (Name -> Bool) -> Document -> Maybe Element
 findDocumentTag p = findElementTag p . documentRoot
 
 documentImagesWithoutAlt :: Document -> Set Text
-documentImagesWithoutAlt d = S.fromList $ flip mapMaybe (findDocumentTags (== "img") d) $ \e -> do
-  src <- M.lookup "src" (elementAttributes e) -- We skip the ones without a 'src' attribute because we cannot identify them.
-  case M.lookup "alt" (elementAttributes e) of
-    Nothing -> Just src
-    Just "" -> Just src
-    Just a -> if T.null (T.strip a) then Just src else Nothing
+documentImagesWithoutAlt d = S.fromList
+  $ flip mapMaybe (findDocumentTags (== "img") d)
+  $ \e -> do
+    src <- M.lookup "src" (elementAttributes e) -- We skip the ones without a 'src' attribute because we cannot identify them.
+    case M.lookup "alt" (elementAttributes e) of
+      Nothing -> Just src
+      Just "" -> Just src
+      Just a -> if T.null (T.strip a) then Just src else Nothing
 
 findElementTag :: (Name -> Bool) -> Element -> Maybe Element
 findElementTag p e@Element {..} =
