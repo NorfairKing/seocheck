@@ -6,7 +6,11 @@ import Network.URI
 import YamlParse.Applicative
 
 data Flags
-  = Flags {flagUri :: !URI, flagLogLevel :: !(Maybe LogLevel), flagFetchers :: !(Maybe Int)}
+  = Flags
+      { flagUri :: !URI,
+        flagLogLevel :: !(Maybe LogLevel),
+        flagFetchers :: !(Maybe Int)
+      }
   deriving (Show, Eq)
 
 data Configuration
@@ -24,5 +28,9 @@ instance YamlSchema Configuration where
   yamlSchema = pure Configuration
 
 data Settings
-  = Settings {setUri :: !URI, setLogLevel :: !LogLevel, setFetchers :: !(Maybe Int)}
+  = Settings
+      { setUri :: !URI,
+        setLogLevel :: !LogLevel,
+        setFetchers :: !(Maybe Int)
+      }
   deriving (Show, Eq)

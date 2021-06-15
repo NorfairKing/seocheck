@@ -4,6 +4,7 @@
 
 module SeoCheck
   ( seoCheck,
+    runSeoCheck,
   )
 where
 
@@ -38,8 +39,10 @@ import Text.XML as XML
 import UnliftIO hiding (link)
 
 seoCheck :: IO ()
-seoCheck = do
-  Settings {..} <- getSettings
+seoCheck = getSettings >>= runSeoCheck
+
+runSeoCheck :: Settings -> IO ()
+runSeoCheck Settings {..} = do
   man <- HTTP.newTlsManager
   queue <- newTQueueIO
   seen <- newTVarIO S.empty
