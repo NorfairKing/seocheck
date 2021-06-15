@@ -60,10 +60,9 @@ runSeoCheck Settings {..} = do
   resultsMap <- readTVarIO results
   bytestringMaker <- byteStringMakerFromEnvironment
   mapM_ (mapM_ SB.putStr . chunksToByteStrings bytestringMaker) $ renderSEOResult $ SEOResult {seoResultPageResults = resultsMap}
-  exitWith $
-    if any resultBad resultsMap
-      then ExitFailure 1
-      else ExitSuccess
+  when (any resultBad resultsMap)
+    $ exitWith
+    $ ExitFailure 1
 
 newtype SEOResult
   = SEOResult
