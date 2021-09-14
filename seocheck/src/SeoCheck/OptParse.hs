@@ -30,6 +30,7 @@ deriveSettings Flags {..} Environment _ = do
   let setUri = flagUri
       setLogLevel = fromMaybe LevelWarn flagLogLevel
       setFetchers = flagFetchers
+      setMaxDepth = flagMaxDepth
   pure Settings {..}
 
 getFlags :: IO Flags
@@ -74,6 +75,15 @@ parseFlags =
         ( mconcat
             [ long "fetchers",
               help "The number of threads to fetch from. This application is usually not CPU bound so you can comfortably set this higher than the number of cores you have",
+              metavar "INT",
+              value Nothing
+            ]
+        )
+      <*> option
+        (Just <$> auto)
+        ( mconcat
+            [ long "max-depth",
+              help "The maximum length of the path from the root to a given URI",
               metavar "INT",
               value Nothing
             ]

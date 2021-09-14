@@ -50,24 +50,23 @@ runSeoCheck Settings {..} = do
   let fetchers = fromMaybe 1 setFetchers
       indexes = [0 .. fetchers - 1]
   fetcherStati <- newTVarIO $ IM.fromList $ zip indexes (repeat True)
-  atomically $ writeTQueue queue (Link A setUri)
-  runStderrLoggingT
-    $ filterLogger (\_ ll -> ll >= setLogLevel)
-    $ do
-      logInfoN $ "Running with " <> T.pack (show fetchers) <> " fetchers"
-      forConcurrently_ indexes $ \ix ->
-        worker setUri man queue seen results fetcherStati ix
+  atomically $ writeTQueue queue (Link A setUri 0)
+  runStderrLoggingT $
+    filterLogger (\_ ll -> ll >= setLogLevel) $
+      do
+        logInfoN $ "Running with " <> T.pack (show fetchers) <> " fetchers"
+        forConcurrently_ indexes $ \ix ->
+          worker setMaxDepth man queue seen results fetcherStati ix
   resultsMap <- readTVarIO results
   bytestringMaker <- byteStringMakerFromEnvironment
   mapM_ (mapM_ SB.putStr . chunksToByteStrings bytestringMaker) $ renderSEOResult $ SEOResult {seoResultPageResults = resultsMap}
-  when (any resultBad resultsMap)
-    $ exitWith
-    $ ExitFailure 1
+  when (any resultBad resultsMap) $
+    exitWith $
+      ExitFailure 1
 
-newtype SEOResult
-  = SEOResult
-      { seoResultPageResults :: Map Link Result
-      }
+newtype SEOResult = SEOResult
+  { seoResultPageResults :: Map Link Result
+  }
   deriving (Show, Eq)
 
 renderSEOResult :: SEOResult -> [[Chunk]]
@@ -127,8 +126,16 @@ renderDocResult DocResult {..} =
     [chunk "\n"] -- Empty line
   ]
 
-worker :: URI -> HTTP.Manager -> TQueue Link -> TVar (Set Link) -> TVar (Map Link Result) -> TVar (IntMap Bool) -> Int -> LoggingT IO ()
-worker root man queue seen results stati index = go True
+worker ::
+  Maybe Word ->
+  HTTP.Manager ->
+  TQueue Link ->
+  TVar (Set Link) ->
+  TVar (Map Link Result) ->
+  TVar (IntMap Bool) ->
+  Int ->
+  LoggingT IO ()
+worker maxDepth man queue seen results stati index = go True
   where
     setStatus b = atomically $ modifyTVar' stati $ IM.insert index b
     setBusy = setStatus True
@@ -164,40 +171,47 @@ worker root man queue seen results stati index = go True
             else do
               -- We haven't seen it yet. Mark it as seen.
               atomically $ modifyTVar' seen $ S.insert link
-              mres <- produceResult man root link
+              mres <- produceResult man link
               forM_ mres $ \res -> do
                 atomically $ modifyTVar' results $ M.insert link res
-                forM_ (docResultLinks <$> resultDocResult res) $ \uris ->
-                  atomically $ mapM_ (writeTQueue queue) uris
+                let recurse = case maxDepth of
+                      Nothing -> True
+                      Just md -> linkDepth link < md
+                when recurse $
+                  forM_ (docResultLinks <$> resultDocResult res) $ \uris ->
+                    atomically $ mapM_ (writeTQueue queue) uris
           -- Filter out the ones that are not on the same host.
           go True
 
-data Link = Link {linkType :: LinkType, linkUri :: URI}
+data Link = Link
+  { linkType :: LinkType,
+    linkUri :: URI,
+    linkDepth :: Word
+  }
   deriving (Show, Eq, Ord)
 
 data LinkType = A | IMG | LINK
   deriving (Show, Eq, Ord)
 
-data Result
-  = Result
-      { resultStatus :: HTTP.Status,
-        resultDocResult :: Maybe DocResult
-      }
+data Result = Result
+  { resultStatus :: HTTP.Status,
+    resultDocResult :: Maybe DocResult
+  }
   deriving (Show, Eq)
 
 resultBad :: Result -> Bool
 resultBad Result {..} =
-  not
-    $ validationIsValid
-    $ mconcat
-      [ declare "The status code is in the 200 range" $
-          let sci = HTTP.statusCode resultStatus
-           in 200 <= sci && sci < 300,
-        decorate "Doc result" $ maybe valid docResultValidation resultDocResult
-      ]
+  not $
+    validationIsValid $
+      mconcat
+        [ declare "The status code is in the 200 range" $
+            let sci = HTTP.statusCode resultStatus
+             in 200 <= sci && sci < 300,
+          decorate "Doc result" $ maybe valid docResultValidation resultDocResult
+        ]
 
-produceResult :: HTTP.Manager -> URI -> Link -> LoggingT IO (Maybe Result)
-produceResult man root link =
+produceResult :: HTTP.Manager -> Link -> LoggingT IO (Maybe Result)
+produceResult man link =
   let uri = linkUri link
    in -- Create a request
       case requestFromURI uri of
@@ -215,27 +229,26 @@ produceResult man root link =
           let body = responseBody resp
           let headers = responseHeaders resp
               contentType = lookup hContentType headers
-          pure
-            $ Just
-            $ Result
-              { resultStatus = responseStatus resp,
-                resultDocResult = case linkType link of
-                  A -> do
-                    ct <- contentType
-                    if "text/html" `SB.isInfixOf` ct
-                      then Just $ produceDocResult root resp $ HTML.parseLBS body
-                      else Nothing
-                  _ -> Nothing
-              }
+          pure $
+            Just $
+              Result
+                { resultStatus = responseStatus resp,
+                  resultDocResult = case linkType link of
+                    A -> do
+                      ct <- contentType
+                      if "text/html" `SB.isInfixOf` ct
+                        then Just $ produceDocResult link resp $ HTML.parseLBS body
+                        else Nothing
+                    _ -> Nothing
+                }
 
-data DocResult
-  = DocResult
-      { docResultLinks :: ![Link],
-        docResultDocType :: !DocTypeResult,
-        docResultTitle :: !TitleResult,
-        docResultDescription :: !DescriptionResult,
-        docResultImagesWithoutAlt :: !(Set Text) -- The 'src' tags of those images
-      }
+data DocResult = DocResult
+  { docResultLinks :: ![Link],
+    docResultDocType :: !DocTypeResult,
+    docResultTitle :: !TitleResult,
+    docResultDescription :: !DescriptionResult,
+    docResultImagesWithoutAlt :: !(Set Text) -- The 'src' tags of those images
+  }
   deriving (Show, Eq)
 
 docResultValidation :: DocResult -> Validation
@@ -255,41 +268,42 @@ docResultValidation DocResult {..} =
       declare "There are no pages without alt tags" $ S.null docResultImagesWithoutAlt
     ]
 
-produceDocResult :: URI -> Response LB.ByteString -> XML.Document -> DocResult
-produceDocResult root resp d =
+produceDocResult :: Link -> Response LB.ByteString -> XML.Document -> DocResult
+produceDocResult link resp d =
   DocResult
-    { docResultLinks = documentLinks root d,
+    { docResultLinks = documentLinks link d,
       docResultDocType = documentDocType resp,
       docResultTitle = documentTitle d,
       docResultDescription = documentDescription d,
       docResultImagesWithoutAlt = documentImagesWithoutAlt d
     }
 
-documentLinks :: URI -> Document -> [Link]
-documentLinks root = elementLinks root . documentRoot
+documentLinks :: Link -> Document -> [Link]
+documentLinks link = elementLinks link . documentRoot
 
-elementLinks :: URI -> Element -> [Link]
-elementLinks root Element {..} =
-  ( case singleElementLink root elementName elementAttributes of
+elementLinks :: Link -> Element -> [Link]
+elementLinks link Element {..} =
+  ( case singleElementLink link elementName elementAttributes of
       Nothing -> id
       Just l -> (l :)
   )
-    $ concatMap (nodeLinks root) elementNodes
+    $ concatMap (nodeLinks link) elementNodes
 
-singleElementLink :: URI -> Name -> Map Name Text -> Maybe Link
-singleElementLink root name attrs = do
+singleElementLink :: Link -> Name -> Map Name Text -> Maybe Link
+singleElementLink link name attrs = do
   (typ, t) <- case name of
     "a" -> (,) A <$> M.lookup "href" attrs
     "link" -> (,) LINK <$> M.lookup "href" attrs
     "img" -> (,) IMG <$> M.lookup "src" attrs
     _ -> Nothing
+  let root = linkUri link
   uri <- parseURIRelativeTo root $ T.unpack t
   guard $ uriAuthority uri == uriAuthority root
-  pure $ Link {linkType = typ, linkUri = uri}
+  pure $ Link {linkType = typ, linkUri = uri, linkDepth = succ (linkDepth link)}
 
-nodeLinks :: URI -> Node -> [Link]
-nodeLinks root = \case
-  NodeElement e -> elementLinks root e
+nodeLinks :: Link -> Node -> [Link]
+nodeLinks link = \case
+  NodeElement e -> elementLinks link e
   NodeContent _ -> []
   NodeComment _ -> []
   NodeInstruction _ -> []
@@ -354,14 +368,14 @@ findDocumentTag :: (Name -> Bool) -> Document -> Maybe Element
 findDocumentTag p = findElementTag p . documentRoot
 
 documentImagesWithoutAlt :: Document -> Set Text
-documentImagesWithoutAlt d = S.fromList
-  $ flip mapMaybe (findDocumentTags (== "img") d)
-  $ \e -> do
-    src <- M.lookup "src" (elementAttributes e) -- We skip the ones without a 'src' attribute because we cannot identify them.
-    case M.lookup "alt" (elementAttributes e) of
-      Nothing -> Just src
-      Just "" -> Just src
-      Just a -> if T.null (T.strip a) then Just src else Nothing
+documentImagesWithoutAlt d = S.fromList $
+  flip mapMaybe (findDocumentTags (== "img") d) $
+    \e -> do
+      src <- M.lookup "src" (elementAttributes e) -- We skip the ones without a 'src' attribute because we cannot identify them.
+      case M.lookup "alt" (elementAttributes e) of
+        Nothing -> Just src
+        Just "" -> Just src
+        Just a -> if T.null (T.strip a) then Just src else Nothing
 
 findElementTag :: (Name -> Bool) -> Element -> Maybe Element
 findElementTag p e@Element {..} =

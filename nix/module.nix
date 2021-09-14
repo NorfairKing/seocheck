@@ -4,7 +4,7 @@ with lib;
 
 let
   cfg = config.services.smos."${envname}";
-  concatAttrs = attrList: fold (x: y: x // y) {} attrList;
+  concatAttrs = attrList: fold (x: y: x // y) { } attrList;
 in
 {
   options.services.smos."${envname}" =
@@ -112,37 +112,37 @@ in
         let
           workingDir = "/www/smos/${envname}/data/";
         in
-          optionalAttrs enable {
-            "smos-sync-${envname}" = {
-              description = "Smos sync server ${envname} Service";
-              wantedBy = [ "multi-user.target" ];
-              environment =
-                {
-                  "SMOS_SERVER_LOG_LEVEL" =
-                    "${builtins.toString log-level}";
-                  "SMOS_SERVER_PORT" =
-                    "${builtins.toString port}";
-                };
-              script =
-                ''
-                  mkdir -p "${workingDir}"
-                  cd "${workingDir}"
-                  ${smosPkgs.smos-server}/bin/smos-server \
-                    serve
-                '';
-              serviceConfig =
-                {
-                  Restart = "always";
-                  RestartSec = 1;
-                  Nice = 15;
-                };
-              unitConfig =
-                {
-                  StartLimitIntervalSec = 0;
-                  # ensure Restart=always is always honoured
-                };
-            };
+        optionalAttrs enable {
+          "smos-sync-${envname}" = {
+            description = "Smos sync server ${envname} Service";
+            wantedBy = [ "multi-user.target" ];
+            environment =
+              {
+                "SMOS_SERVER_LOG_LEVEL" =
+                  "${builtins.toString log-level}";
+                "SMOS_SERVER_PORT" =
+                  "${builtins.toString port}";
+              };
+            script =
+              ''
+                mkdir -p "${workingDir}"
+                cd "${workingDir}"
+                ${smosPkgs.smos-server}/bin/smos-server \
+                  serve
+              '';
+            serviceConfig =
+              {
+                Restart = "always";
+                RestartSec = 1;
+                Nice = 15;
+              };
+            unitConfig =
+              {
+                StartLimitIntervalSec = 0;
+                # ensure Restart=always is always honoured
+              };
           };
+        };
       sync-server-host =
         with cfg.sync-server;
 
@@ -162,20 +162,20 @@ in
             };
         };
     in
-      mkIf cfg.enable {
-        systemd.services =
-          concatAttrs [
-            docs-site-service
-            sync-server-service
-          ];
-        networking.firewall.allowedTCPPorts = builtins.concatLists [
-          (optional cfg.docs-site.enable cfg.docs-site.port)
-          (optional cfg.sync-server.enable cfg.sync-server.port)
+    mkIf cfg.enable {
+      systemd.services =
+        concatAttrs [
+          docs-site-service
+          sync-server-service
         ];
-        services.nginx.virtualHosts =
-          concatAttrs [
-            docs-site-host
-            sync-server-host
-          ];
-      };
+      networking.firewall.allowedTCPPorts = builtins.concatLists [
+        (optional cfg.docs-site.enable cfg.docs-site.port)
+        (optional cfg.sync-server.enable cfg.sync-server.port)
+      ];
+      services.nginx.virtualHosts =
+        concatAttrs [
+          docs-site-host
+          sync-server-host
+        ];
+    };
 }

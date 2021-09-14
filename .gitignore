@@ -1,4 +1,5 @@
 .stack-work/
+stack.yaml.lock
 *~
 result*
 .pre-commit-config.yaml

@@ -6,38 +6,42 @@ with final.haskell.lib;
     let
       seoCheckPkg =
         name:
-          doBenchmark (
-            addBuildDepend (
+        doBenchmark (
+          addBuildDepend
+            (
               failOnAllWarnings (
                 disableLibraryProfiling (
-                  final.haskellPackages.callCabal2nix name (final.gitignoreSource (../. + "/${name}")) {}
+                  final.haskellPackages.callCabal2nix name (final.gitignoreSource (../. + "/${name}")) { }
                 )
               )
-            ) (final.haskellPackages.autoexporter)
-          );
+            )
+            (final.haskellPackages.autoexporter)
+        );
       seoCheckPkgWithComp =
         exeName: name:
-          generateOptparseApplicativeCompletion exeName (seoCheckPkg name);
+        generateOptparseApplicativeCompletion exeName (seoCheckPkg name);
       seoCheckPkgWithOwnComp = name: seoCheckPkgWithComp name name;
     in
-      {
-        "seocheck" = seoCheckPkgWithOwnComp "seocheck";
-      };
+    {
+      "seocheck" = seoCheckPkgWithOwnComp "seocheck";
+    };
   haskellPackages =
     previous.haskellPackages.override (
       old:
-        {
-          overrides =
-            final.lib.composeExtensions (
+      {
+        overrides =
+          final.lib.composeExtensions
+            (
               old.overrides or (
                 _:
                 _:
-                  {}
+                { }
               )
-            ) (
+            )
+            (
               self: super:
                 final.seoCheckPackages
             );
-        }
+      }
     );
 }
