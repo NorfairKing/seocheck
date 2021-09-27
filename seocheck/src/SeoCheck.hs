@@ -35,6 +35,7 @@ import Rainbow
 import SeoCheck.OptParse
 import System.Exit
 import Text.HTML.DOM as HTML
+import Text.Show.Pretty (ppShow)
 import Text.XML as XML
 import UnliftIO hiding (link)
 
@@ -42,7 +43,7 @@ seoCheck :: IO ()
 seoCheck = getSettings >>= runSeoCheck
 
 runSeoCheck :: Settings -> IO ()
-runSeoCheck Settings {..} = do
+runSeoCheck settings@Settings {..} = do
   man <- HTTP.newTlsManager
   queue <- newTQueueIO
   seen <- newTVarIO S.empty
@@ -52,11 +53,11 @@ runSeoCheck Settings {..} = do
   fetcherStati <- newTVarIO $ IM.fromList $ zip indexes (repeat True)
   atomically $ writeTQueue queue (Link A setUri 0)
   runStderrLoggingT $
-    filterLogger (\_ ll -> ll >= setLogLevel) $
-      do
-        logInfoN $ "Running with " <> T.pack (show fetchers) <> " fetchers"
-        forConcurrently_ indexes $ \ix ->
-          worker setMaxDepth man queue seen results fetcherStati ix
+    filterLogger (\_ ll -> ll >= setLogLevel) $ do
+      logDebugN $ T.pack $ ppShow settings
+      logInfoN $ "Running with " <> T.pack (show fetchers) <> " fetchers"
+      forConcurrently_ indexes $ \ix ->
+        worker setMaxDepth man queue seen results fetcherStati ix
   resultsMap <- readTVarIO results
   bytestringMaker <- byteStringMakerFromEnvironment
   mapM_ (mapM_ SB.putStr . chunksToByteStrings bytestringMaker) $ renderSEOResult $ SEOResult {seoResultPageResults = resultsMap}
@@ -130,7 +131,7 @@ worker ::
   Maybe Word ->
   HTTP.Manager ->
   TQueue Link ->
-  TVar (Set Link) ->
+  TVar (Set URI) ->
   TVar (Map Link Result) ->
   TVar (IntMap Bool) ->
   Int ->
@@ -162,16 +163,16 @@ worker maxDepth man queue seen results stati index = go True
           logDebugN $ "Worker is busy: " <> T.pack (show index)
           unless busy setBusy
           -- Check if the link has been seen already
-          alreadySeen <- S.member link <$> readTVarIO seen
+          alreadySeen <- S.member (linkUri link) <$> readTVarIO seen
           if alreadySeen
             then do
               -- We've already seen it, don't do anything.
-              logDebugN $ "Not fetching again: " <> T.pack (show link)
+              logDebugN $ "Not fetching again: " <> T.pack (show (linkUri link))
               pure ()
             else do
               -- We haven't seen it yet. Mark it as seen.
-              atomically $ modifyTVar' seen $ S.insert link
-              mres <- produceResult man link
+              atomically $ modifyTVar' seen $ S.insert (linkUri link)
+              mres <- produceResult maxDepth man link
               forM_ mres $ \res -> do
                 atomically $ modifyTVar' results $ M.insert link res
                 let recurse = case maxDepth of
@@ -184,18 +185,21 @@ worker maxDepth man queue seen results stati index = go True
           go True
 
 data Link = Link
-  { linkType :: LinkType,
-    linkUri :: URI,
-    linkDepth :: Word
+  { linkType :: !LinkType,
+    linkUri :: !URI,
+    linkDepth :: !Word
   }
   deriving (Show, Eq, Ord)
 
-data LinkType = A | IMG | LINK
+data LinkType
+  = A
+  | IMG
+  | LINK
   deriving (Show, Eq, Ord)
 
 data Result = Result
-  { resultStatus :: HTTP.Status,
-    resultDocResult :: Maybe DocResult
+  { resultStatus :: !HTTP.Status,
+    resultDocResult :: !(Maybe DocResult)
   }
   deriving (Show, Eq)
 
@@ -210,37 +214,39 @@ resultBad Result {..} =
           decorate "Doc result" $ maybe valid docResultValidation resultDocResult
         ]
 
-produceResult :: HTTP.Manager -> Link -> LoggingT IO (Maybe Result)
-produceResult man link =
-  let uri = linkUri link
-   in -- Create a request
-      case requestFromURI uri of
-        Nothing -> do
-          logErrorN $ "Unable to construct a request from this uri: " <> T.pack (show uri)
-          pure Nothing
-        Just req -> do
-          logInfoN $ "Fetching: " <> T.pack (show uri)
-          -- Do the actual fetch
-          resp <- liftIO $ httpLbs req man
-          let status = responseStatus resp
-          let sci = HTTP.statusCode status
-          logDebugN $ "Got response for " <> T.pack (show uri) <> ": " <> T.pack (show sci)
-          -- If the status code is not in the 2XX range, add it to the results
-          let body = responseBody resp
-          let headers = responseHeaders resp
-              contentType = lookup hContentType headers
-          pure $
-            Just $
-              Result
-                { resultStatus = responseStatus resp,
-                  resultDocResult = case linkType link of
-                    A -> do
-                      ct <- contentType
-                      if "text/html" `SB.isInfixOf` ct
-                        then Just $ produceDocResult link resp $ HTML.parseLBS body
-                        else Nothing
-                    _ -> Nothing
-                }
+produceResult :: Maybe Word -> HTTP.Manager -> Link -> LoggingT IO (Maybe Result)
+produceResult maxDepth man link@Link {..} =
+  -- Create a request
+  case requestFromURI linkUri of
+    Nothing -> do
+      logErrorN $ "Unable to construct a request from this uri: " <> T.pack (show linkUri)
+      pure Nothing
+    Just req -> do
+      let fetchingLog = case maxDepth of
+            Nothing -> ["Fetching: ", show linkUri]
+            Just md -> ["Depth ", show linkDepth, "/", show md, "; Fetching: ", show linkUri]
+      logInfoN $ T.pack $ concat fetchingLog
+      -- Do the actual fetch
+      resp <- liftIO $ httpLbs req man
+      let status = responseStatus resp
+      let sci = HTTP.statusCode status
+      logDebugN $ "Got response for " <> T.pack (show linkUri) <> ": " <> T.pack (show sci)
+      -- If the status code is not in the 2XX range, add it to the results
+      let body = responseBody resp
+      let headers = responseHeaders resp
+          contentType = lookup hContentType headers
+      pure $
+        Just $
+          Result
+            { resultStatus = responseStatus resp,
+              resultDocResult = case linkType of
+                A -> do
+                  ct <- contentType
+                  if "text/html" `SB.isInfixOf` ct
+                    then Just $ produceDocResult link resp $ HTML.parseLBS body
+                    else Nothing
+                _ -> Nothing
+            }
 
 data DocResult = DocResult
   { docResultLinks :: ![Link],

@@ -1,13 +1,13 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.2.
+-- This file has been generated from package.yaml by hpack version 0.34.4.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 5abf9a1119f5566166ae57f92141f73a6cca321812d186afd5a96c845b6c66be
+-- hash: 08e19e35e7ed15741e3450917623b3cf453999e49fd305b5696f67d779743a35
 
 name:           seocheck
-version:        0.0.0.0
+version:        0.1.0.0
 homepage:       https://github.com/NorfairKing/seocheck#readme
 bug-reports:    https://github.com/NorfairKing/seocheck/issues
 author:         Tom Sydney Kerckhove
@@ -45,6 +45,7 @@ library
     , optparse-applicative
     , path
     , path-io
+    , pretty-show
     , rainbow
     , stm
     , text
