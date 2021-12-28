@@ -1,9 +1,9 @@
 name:                seocheck
-version:             0.1.0.0
+version:             0.0.0.0
 github:              "NorfairKing/seocheck"
 author:              "Tom Sydney Kerckhove"
 maintainer:          "syd@cs-syd.eu"
-copyright:           "Copyright (c) 2020 Tom Sydney Kerckhove"
+copyright:           "Copyright (c) 2020-2022 Tom Sydney Kerckhove"
 
 dependencies:
 - base >= 4.7 && < 5
@@ -16,7 +16,6 @@ library:
     - case-insensitive
     - conduit
     - containers
-    - envparse
     - html-conduit
     - http-client
     - http-client-tls
@@ -31,10 +30,8 @@ library:
     - stm
     - text
     - unliftio
-    - unliftio
     - validity
     - xml-conduit
-    - yamlparse-applicative
 
 executables:
   seocheck:

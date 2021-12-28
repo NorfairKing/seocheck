@@ -1,30 +1,17 @@
 final: previous:
 with final.haskell.lib;
 
+let
+  seocheck =
+    generateOptparseApplicativeCompletion "seocheck" (
+      buildStrictly (
+        disableLibraryProfiling (
+          final.haskellPackages.callCabal2nixWithOptions "seocheck" (final.gitignoreSource (../seocheck)) "--no-hpack" { }
+        )
+      ));
+in
 {
-  seoCheckPackages =
-    let
-      seoCheckPkg =
-        name:
-        doBenchmark (
-          addBuildDepend
-            (
-              failOnAllWarnings (
-                disableLibraryProfiling (
-                  final.haskellPackages.callCabal2nix name (final.gitignoreSource (../. + "/${name}")) { }
-                )
-              )
-            )
-            (final.haskellPackages.autoexporter)
-        );
-      seoCheckPkgWithComp =
-        exeName: name:
-        generateOptparseApplicativeCompletion exeName (seoCheckPkg name);
-      seoCheckPkgWithOwnComp = name: seoCheckPkgWithComp name name;
-    in
-    {
-      "seocheck" = seoCheckPkgWithOwnComp "seocheck";
-    };
+  seocheck = justStaticExecutables seocheck;
   haskellPackages =
     previous.haskellPackages.override (
       old:
@@ -40,7 +27,7 @@ with final.haskell.lib;
             )
             (
               self: super:
-                final.seoCheckPackages
+                { inherit seocheck; }
             );
       }
     );

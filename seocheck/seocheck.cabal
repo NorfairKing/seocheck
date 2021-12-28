@@ -1,18 +1,18 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.4.
+-- This file has been generated from package.yaml by hpack version 0.34.5.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 08e19e35e7ed15741e3450917623b3cf453999e49fd305b5696f67d779743a35
+-- hash: 6ba51396a46ee4ef673e4bd8feff0747fb72505bfb6c1bc4044ca38b1bf6b5de
 
 name:           seocheck
-version:        0.1.0.0
+version:        0.0.0.0
 homepage:       https://github.com/NorfairKing/seocheck#readme
 bug-reports:    https://github.com/NorfairKing/seocheck/issues
 author:         Tom Sydney Kerckhove
 maintainer:     syd@cs-syd.eu
-copyright:      Copyright (c) 2020 Tom Sydney Kerckhove
+copyright:      Copyright (c) 2020-2022 Tom Sydney Kerckhove
 build-type:     Simple
 
 source-repository head
@@ -35,7 +35,6 @@ library
     , case-insensitive
     , conduit
     , containers
-    , envparse
     , html-conduit
     , http-client
     , http-client-tls
@@ -52,7 +51,6 @@ library
     , unliftio
     , validity
     , xml-conduit
-    , yamlparse-applicative
   default-language: Haskell2010
 
 executable seocheck
