@@ -304,8 +304,15 @@ singleElementLink link name attrs = do
     _ -> Nothing
   let root = linkUri link
   uri <- parseURIRelativeTo root $ T.unpack t
-  guard $ uriAuthority uri == uriAuthority root
-  pure $ Link {linkType = typ, linkUri = uri, linkDepth = succ (linkDepth link)}
+  -- We remove the fragment so that the same uri is not fetched twice.
+  let uri' = uri {uriFragment = ""}
+  guard $ uriAuthority uri' == uriAuthority root
+  pure $
+    Link
+      { linkType = typ,
+        linkUri = uri',
+        linkDepth = succ (linkDepth link)
+      }
 
 nodeLinks :: Link -> Node -> [Link]
 nodeLinks link = \case
