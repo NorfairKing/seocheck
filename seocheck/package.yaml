@@ -1,9 +1,15 @@
-name:                seocheck
-version:             0.0.0.0
-github:              "NorfairKing/seocheck"
-author:              "Tom Sydney Kerckhove"
-maintainer:          "syd@cs-syd.eu"
-copyright:           "Copyright (c) 2020-2022 Tom Sydney Kerckhove"
+name: seocheck
+version: 0.1.0.0
+github: "NorfairKing/seocheck"
+author: "Tom Sydney Kerckhove"
+maintainer: "syd@cs-syd.eu"
+copyright: "Copyright (c) 2020-2022 Tom Sydney Kerckhove"
+license: MIT
+synopsis: Check for common SEO mistakes on CI
+
+extra-source-files:
+- LICENSE
+- CHANGELOG.md
 
 dependencies:
 - base >= 4.7 && < 5
