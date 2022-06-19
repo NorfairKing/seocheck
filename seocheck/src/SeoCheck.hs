@@ -31,9 +31,10 @@ import Network.HTTP.Client as HTTP
 import Network.HTTP.Client.TLS as HTTP
 import Network.HTTP.Types as HTTP
 import Network.URI
-import Rainbow
 import SeoCheck.OptParse
 import System.Exit
+import Text.Colour
+import Text.Colour.Term
 import Text.HTML.DOM as HTML
 import Text.Show.Pretty (ppShow)
 import Text.XML as XML
@@ -59,11 +60,8 @@ runSeoCheck settings@Settings {..} = do
       forConcurrently_ indexes $ \ix ->
         worker setMaxDepth man queue seen results fetcherStati ix
   resultsMap <- readTVarIO results
-  bytestringMaker <- byteStringMakerFromEnvironment
-  mapM_ (mapM_ SB.putStr . chunksToByteStrings bytestringMaker) $ renderSEOResult $ SEOResult {seoResultPageResults = resultsMap}
-  when (any resultBad resultsMap) $
-    exitWith $
-      ExitFailure 1
+  putChunks $ concat $ renderSEOResult $ SEOResult {seoResultPageResults = resultsMap}
+  when (any resultBad resultsMap) $ exitWith $ ExitFailure 1
 
 newtype SEOResult = SEOResult
   { seoResultPageResults :: Map Link Result
