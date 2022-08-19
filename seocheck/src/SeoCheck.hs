@@ -60,7 +60,7 @@ runSeoCheck settings@Settings {..} = do
       forConcurrently_ indexes $ \ix ->
         worker setMaxDepth man queue seen results fetcherStati ix
   resultsMap <- readTVarIO results
-  putChunks $ concat $ renderSEOResult $ SEOResult {seoResultPageResults = resultsMap}
+  putChunksLocale $ concat $ renderSEOResult $ SEOResult {seoResultPageResults = resultsMap}
   when (any resultBad resultsMap) $ exitWith $ ExitFailure 1
 
 newtype SEOResult = SEOResult
