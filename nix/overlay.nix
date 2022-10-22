@@ -1,34 +1,15 @@
-final: previous:
+final: prev:
 with final.haskell.lib;
 
-let
-  seocheck =
-    generateOptparseApplicativeCompletion "seocheck" (
-      buildStrictly (
-        disableLibraryProfiling (
-          final.haskellPackages.callCabal2nixWithOptions "seocheck" (final.gitignoreSource (../seocheck)) "--no-hpack" { }
-        )
-      ));
-in
 {
-  seocheck = justStaticExecutables seocheck;
+  seocheck = justStaticExecutables final.haskellPackages.seocheck;
   haskellPackages =
-    previous.haskellPackages.override (
-      old:
-      {
-        overrides =
-          final.lib.composeExtensions
-            (
-              old.overrides or (
-                _:
-                _:
-                { }
-              )
-            )
-            (
-              self: super:
-                { inherit seocheck; }
-            );
-      }
+    prev.haskellPackages.override (old: {
+      overrides = final.lib.composeExtensions (old.overrides or (_: _: { })) (
+        self: super: {
+          seocheck = generateOptparseApplicativeCompletion "seocheck" (buildStrictly (self.callPackage ../seocheck { }));
+        }
+      );
+    }
     );
 }
