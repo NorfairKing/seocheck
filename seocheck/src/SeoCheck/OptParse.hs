@@ -55,33 +55,33 @@ parseFlags =
             metavar "URI"
           ]
       )
-      <*> option
-        (Just <$> maybeReader parseLogLevel)
-        ( mconcat
-            [ long "log-level",
-              help $ "The log level, example values: " <> show (map (drop 5 . show) [LevelDebug, LevelInfo, LevelWarn, LevelError]),
-              metavar "LOG_LEVEL",
-              value Nothing
-            ]
-        )
-      <*> option
-        (Just <$> auto)
-        ( mconcat
-            [ long "fetchers",
-              help "The number of threads to fetch from. This application is usually not CPU bound so you can comfortably set this higher than the number of cores you have",
-              metavar "INT",
-              value Nothing
-            ]
-        )
-      <*> option
-        (Just <$> auto)
-        ( mconcat
-            [ long "max-depth",
-              help "The maximum length of the path from the root to a given URI",
-              metavar "INT",
-              value Nothing
-            ]
-        )
+    <*> option
+      (Just <$> maybeReader parseLogLevel)
+      ( mconcat
+          [ long "log-level",
+            help $ "The log level, example values: " <> show (map (drop 5 . show) [LevelDebug, LevelInfo, LevelWarn, LevelError]),
+            metavar "LOG_LEVEL",
+            value Nothing
+          ]
+      )
+    <*> option
+      (Just <$> auto)
+      ( mconcat
+          [ long "fetchers",
+            help "The number of threads to fetch from. This application is usually not CPU bound so you can comfortably set this higher than the number of cores you have",
+            metavar "INT",
+            value Nothing
+          ]
+      )
+    <*> option
+      (Just <$> auto)
+      ( mconcat
+          [ long "max-depth",
+            help "The maximum length of the path from the root to a given URI",
+            metavar "INT",
+            value Nothing
+          ]
+      )
 
 parseLogLevel :: String -> Maybe LogLevel
 parseLogLevel s = readMaybe $ "Level" <> s

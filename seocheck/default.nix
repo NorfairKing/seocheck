@@ -22,4 +22,5 @@ mkDerivation {
   homepage = "https://github.com/NorfairKing/seocheck#readme";
   description = "Check for common SEO mistakes on CI";
   license = lib.licenses.mit;
+  mainProgram = "seocheck";
 }
