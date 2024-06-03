@@ -1,0 +1,4 @@
+- ignore:
+    name: "Use tuple-section"
+- ignore:
+    name: "Use map with tuple-section"

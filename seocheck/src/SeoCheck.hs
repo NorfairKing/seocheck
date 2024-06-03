@@ -139,7 +139,7 @@ worker maxDepth man queue seen results stati index = go True
     setStatus b = atomically $ modifyTVar' stati $ IM.insert index b
     setBusy = setStatus True
     setIdle = setStatus False
-    allDone :: MonadIO m => m Bool
+    allDone :: (MonadIO m) => m Bool
     allDone = all not <$> readTVarIO stati
     go busy = do
       mv <- atomically $ tryReadTQueue queue

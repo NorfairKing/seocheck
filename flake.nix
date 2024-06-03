@@ -1,7 +1,7 @@
 {
   description = "seocheck";
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs?ref=nixos-23.11";
+    nixpkgs.url = "github:NixOS/nixpkgs?ref=nixos-24.05";
     pre-commit-hooks.url = "github:cachix/pre-commit-hooks.nix";
   };
 
@@ -50,14 +50,7 @@
           niv
           zlib
           cabal-install
-        ] ++ (with pre-commit-hooks;
-          [
-            hlint
-            hpack
-            nixpkgs-fmt
-            ormolu
-            cabal2nix
-          ]);
+        ] ++ self.checks.${system}.pre-commit.enabledPackages;
         shellHook = self.checks.${system}.pre-commit.shellHook;
       };
     };
