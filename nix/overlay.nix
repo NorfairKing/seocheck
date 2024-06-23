@@ -7,7 +7,7 @@ with final.haskell.lib;
     prev.haskellPackages.override (old: {
       overrides = final.lib.composeExtensions (old.overrides or (_: _: { })) (
         self: super: {
-          seocheck = self.generateOptparseApplicativeCompletions [ "seocheck" ] (buildStrictly (self.callPackage ../seocheck { }));
+          seocheck = self.opt-env-conf.installManpagesAndCompletions [ "seocheck" ] (buildStrictly (self.callPackage ../seocheck { }));
         }
       );
     }

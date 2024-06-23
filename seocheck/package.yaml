@@ -3,13 +3,14 @@ version: 0.1.0.0
 github: "NorfairKing/seocheck"
 author: "Tom Sydney Kerckhove"
 maintainer: "syd@cs-syd.eu"
-copyright: "Copyright (c) 2020-2022 Tom Sydney Kerckhove"
+copyright: "Copyright (c) 2020-2024 Tom Sydney Kerckhove"
 license: MIT
 synopsis: Check for common SEO mistakes on CI
 
 extra-source-files:
 - LICENSE
 - CHANGELOG.md
+- test_resources/**/*
 
 dependencies:
 - base >= 4.7 && < 5
@@ -28,7 +29,7 @@ library:
     - http-types
     - monad-logger
     - network-uri
-    - optparse-applicative
+    - opt-env-conf
     - path
     - path-io
     - pretty-show
@@ -49,4 +50,19 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
+    - seocheck
+
+tests:
+  seocheck-test:
+    main: Spec.hs
+    source-dirs: test/
+    build-tools: sydtest-discover
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    - -Wall
+    dependencies:
+    - opt-env-conf-test
+    - sydtest
     - seocheck

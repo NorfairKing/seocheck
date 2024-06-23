@@ -1,0 +1,38 @@
+[36mUsage: [m[33mseocheck[m [33mURI[m [37m--log-level[m [33mLOG_LEVEL[m [37m--fetchers[m [33mNUM[m [37m--max-depth[m [33mNUM[m
+
+[36mAll settings[m:
+  [34mThe root uri. This must be an absolute URI. example: http://localhost:8000[m
+  argument: [33mURI[m
+  env: [37mROOT[m [33mURI[m
+  
+  [34mMinimal severity of log messages[m
+  option: [37m--log-level[m [33mLOG_LEVEL[m
+  
+  [34mThe number of threads to fetch from. This application is usually not CPU bound so you can comfortably set this higher than the number of cores you have[m
+  option: [37m--fetchers[m [33mNUM[m
+  env: [37mFETCHERS[m [33mNUM[m
+  config: [37mfetchers[m: [33m<number>[m # [32m64 bit signed integer[m
+  
+  [34mThe maximum length of the path from the root to a given URI[m
+  option: [37m--max-depth[m [33mNUM[m
+  env: [37mMAX_DEPTH[m [33mNUM[m
+  config: [37mmax-depth[m: [33m<number>[m # [32m64 bit unsigned integer[m
+  
+
+[36mOptions[m:
+  [33mURI[m         [34mThe root uri. This must be an absolute URI. example: http://localhost:8000[m                                                                                                
+  [37m--log-level[m [34mMinimal severity of log messages[m                                                                                                                        default: [33mLevelWarn[m
+  [37m--fetchers[m  [34mThe number of threads to fetch from. This application is usually not CPU bound so you can comfortably set this higher than the number of cores you have[m                   
+  [37m--max-depth[m [34mThe maximum length of the path from the root to a given URI[m                                                                                                               
+
+[36mEnvironment Variables[m:
+  [37mROOT[m [33mURI[m        [34mThe root uri. This must be an absolute URI. example: http://localhost:8000[m                                                                             
+  [37mFETCHERS[m [33mNUM[m    [34mThe number of threads to fetch from. This application is usually not CPU bound so you can comfortably set this higher than the number of cores you have[m
+  [37mMAX_DEPTH[m [33mNUM[m   [34mThe maximum length of the path from the root to a given URI[m                                                                                            
+
+[36mConfiguration Values[m:
+  [34mThe number of threads to fetch from. This application is usually not CPU bound so you can comfortably set this higher than the number of cores you have[m
+  [37mfetchers[m: [33m<number>[m # [32m64 bit signed integer[m
+  [34mThe maximum length of the path from the root to a given URI[m
+  [37mmax-depth[m: [33m<number>[m # [32m64 bit unsigned integer[m
+
