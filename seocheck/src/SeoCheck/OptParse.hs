@@ -24,7 +24,7 @@ data Settings = Settings
   deriving (Show, Eq)
 
 instance HasParser Settings where
-  settingsParser = do
+  settingsParser = withLocalYamlConfig $ do
     setUri <-
       setting
         [ help "The root uri. This must be an absolute URI. example: http://localhost:8000",
