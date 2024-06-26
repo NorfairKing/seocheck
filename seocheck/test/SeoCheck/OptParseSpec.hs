@@ -9,4 +9,4 @@ import Test.Syd
 spec :: Spec
 spec = do
   settingsLintSpec @Settings
-  goldenReferenceDocumentationSpec @Settings "test_resources/documentation.txt" "seocheck"
+  goldenSettingsReferenceDocumentationSpec @Settings "test_resources/documentation.txt" "seocheck"
