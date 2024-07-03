@@ -15,16 +15,16 @@
   [34mThe number of threads to fetch from. This application is usually not CPU bound so you can comfortably set this higher than the number of cores you have[m
   option: [37m--fetchers[m [33mNUM[m
   env: [37mFETCHERS[m [33mNUM[m
-  config: [37mfetchers[m:
-    # [32mor null[m
-    [33m<number>[m # [32m64 bit signed integer[m
+  config:
+    [37mfetchers[m: # [32mor null[m
+      [33m<number>[m # [32m64 bit signed integer[m
   
   [34mThe maximum length of the path from the root to a given URI[m
   option: [37m--max-depth[m [33mNUM[m
   env: [37mMAX_DEPTH[m [33mNUM[m
-  config: [37mmax-depth[m:
-    # [32mor null[m
-    [33m<number>[m # [32m64 bit unsigned integer[m
+  config:
+    [37mmax-depth[m: # [32mor null[m
+      [33m<number>[m # [32m64 bit unsigned integer[m
   
 
 [36mOptions[m:
