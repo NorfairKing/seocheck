@@ -13,7 +13,10 @@ import OptEnvConf
 import Paths_seocheck (version)
 
 getSettings :: IO Settings
-getSettings = runSettingsParser version
+getSettings =
+  runSettingsParser
+    version
+    "Check a web site for common SEO problems."
 
 data Settings = Settings
   { setUri :: !URI,

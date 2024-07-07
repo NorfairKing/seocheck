@@ -1,9 +1,9 @@
-[36mUsage: [m[33mseocheck[m [37m--config-file[m [33mFILE[m [33mURI[m [37m--log-level[m [33mLOG_LEVEL[m [37m--fetchers[m [33mNUM[m [37m--max-depth[m [33mNUM[m
+[36mUsage: [m[33mseocheck[m [37m--config-file[m [33mFILE_PATH[m [33mURI[m [37m--log-level[m [33mLOG_LEVEL[m [37m--fetchers[m [33mNUM[m [37m--max-depth[m [33mNUM[m
 
 [36mAll settings[m:
   [34mPath to the configuration file[m
-  option: [37m--config-file[m [33mFILE[m
-  env: [37mCONFIG_FILE[m [33mFILE[m
+  option: [37m--config-file[m [33mFILE_PATH[m
+  env: [37mCONFIG_FILE[m [33mFILE_PATH[m
   
   [34mThe root uri. This must be an absolute URI. example: http://localhost:8000[m
   argument: [33mURI[m
@@ -35,10 +35,10 @@
   [37m--max-depth[m   [34mThe maximum length of the path from the root to a given URI[m                                                                                                               
 
 [36mEnvironment Variables[m:
-  [37mCONFIG_FILE[m [33mFILE[m   [34mPath to the configuration file[m                                                                                                                         
-  [37mROOT[m [33mURI[m           [34mThe root uri. This must be an absolute URI. example: http://localhost:8000[m                                                                             
-  [37mFETCHERS[m [33mNUM[m       [34mThe number of threads to fetch from. This application is usually not CPU bound so you can comfortably set this higher than the number of cores you have[m
-  [37mMAX_DEPTH[m [33mNUM[m      [34mThe maximum length of the path from the root to a given URI[m                                                                                            
+  [37mCONFIG_FILE[m [33mFILE_PATH[m   [34mPath to the configuration file[m                                                                                                                         
+  [37mROOT[m [33mURI[m                [34mThe root uri. This must be an absolute URI. example: http://localhost:8000[m                                                                             
+  [37mFETCHERS[m [33mNUM[m            [34mThe number of threads to fetch from. This application is usually not CPU bound so you can comfortably set this higher than the number of cores you have[m
+  [37mMAX_DEPTH[m [33mNUM[m           [34mThe maximum length of the path from the root to a given URI[m                                                                                            
 
 [36mConfiguration Values[m:
   [34mThe number of threads to fetch from. This application is usually not CPU bound so you can comfortably set this higher than the number of cores you have[m

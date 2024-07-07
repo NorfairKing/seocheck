@@ -85,29 +85,29 @@ packages:
 - completed:
     name: opt-env-conf
     pantry-tree:
-      sha256: e9d4ffcc414fcda65ad0fa5a3317541b23da877fa52ff076484c52dd998b0caf
-      size: 1069
-    sha256: b39d9cff88645ed8dc6a4d9e29ffec457fbfaef894bfec5ab29b724b3f60f649
-    size: 54963
+      sha256: 4b29739111cf239ffb52845a17e5bfc28a803610554abd55ba018e92d831d637
+      size: 1117
+    sha256: 5e2365c13a1c5efcf1284b744d5240bcfb21ae92925050c0236b61df19d1162c
+    size: 67778
     subdir: opt-env-conf
-    url: https://github.com/NorfairKing/opt-env-conf/archive/8b153141dfce39caaa5e8db5d58bacf2e34cc10b.tar.gz
+    url: https://github.com/NorfairKing/opt-env-conf/archive/5ac652b49b6e18bba931528f4f7eaa57ccb10685.tar.gz
     version: 0.0.0.0
   original:
     subdir: opt-env-conf
-    url: https://github.com/NorfairKing/opt-env-conf/archive/8b153141dfce39caaa5e8db5d58bacf2e34cc10b.tar.gz
+    url: https://github.com/NorfairKing/opt-env-conf/archive/5ac652b49b6e18bba931528f4f7eaa57ccb10685.tar.gz
 - completed:
     name: opt-env-conf-test
     pantry-tree:
-      sha256: 99e2224173733eb644e06ca2ff22a000b080f9998d2aa42b497b3efd19c62b80
-      size: 14339
-    sha256: b39d9cff88645ed8dc6a4d9e29ffec457fbfaef894bfec5ab29b724b3f60f649
-    size: 54963
+      sha256: 262d322ef6972cb25d8e8c5ccd1b9f77cf2ec4a89fe1aca4d24304efacaa5d36
+      size: 15867
+    sha256: 5e2365c13a1c5efcf1284b744d5240bcfb21ae92925050c0236b61df19d1162c
+    size: 67778
     subdir: opt-env-conf-test
-    url: https://github.com/NorfairKing/opt-env-conf/archive/8b153141dfce39caaa5e8db5d58bacf2e34cc10b.tar.gz
+    url: https://github.com/NorfairKing/opt-env-conf/archive/5ac652b49b6e18bba931528f4f7eaa57ccb10685.tar.gz
     version: 0.0.0.0
   original:
     subdir: opt-env-conf-test
-    url: https://github.com/NorfairKing/opt-env-conf/archive/8b153141dfce39caaa5e8db5d58bacf2e34cc10b.tar.gz
+    url: https://github.com/NorfairKing/opt-env-conf/archive/5ac652b49b6e18bba931528f4f7eaa57ccb10685.tar.gz
 snapshots:
 - completed:
     sha256: 4be1ca5d31689b524a7f0f17a439bbe9136465213edc498e9a395899a670f2aa
