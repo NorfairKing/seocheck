@@ -2,23 +2,26 @@ resolver: lts-22.22
 packages:
 - seocheck
 extra-deps:
-- github: NorfairKing/safe-coloured-text
-  commit: 61f14d21b7399fe97da24e484c2f9fedaf532bb8
-  subdirs:
-  - safe-coloured-text
-  - safe-coloured-text-layout
-  - safe-coloured-text-gen
-- github: NorfairKing/autodocodec
-  commit: 36779707f38ec3aeb0a591ff8043a63717c96ea2
-  subdirs:
-    - autodocodec
-    - autodocodec-yaml
-    - autodocodec-schema
 - github: NorfairKing/opt-env-conf
-  commit: 5ac652b49b6e18bba931528f4f7eaa57ccb10685
+  commit: 2e6aaaa65eb3f5008b05c28adc29312bd8a47d46
   subdirs:
     - opt-env-conf
     - opt-env-conf-test
+
+- github: NorfairKing/safe-coloured-text
+  commit: 26b7657428f277f819a0831cbddddb7f4c5408f9
+  subdirs:
+    - safe-coloured-text
+    - safe-coloured-text-layout
+    - safe-coloured-text-terminfo
+
+- github: NorfairKing/autodocodec
+  commit: b435803c3367b06c0d38acd90a54ba63e63fb6be
+  subdirs:               
+    - autodocodec
+    - autodocodec-nix
+    - autodocodec-schema  
+    - autodocodec-yaml                            
 system-ghc: true
 nix:
   enable: false
