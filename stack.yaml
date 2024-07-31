@@ -3,7 +3,7 @@ packages:
 - seocheck
 extra-deps:
 - github: NorfairKing/opt-env-conf
-  commit: 2e6aaaa65eb3f5008b05c28adc29312bd8a47d46
+  commit: 14d502e235923daaf39d746c861869a6cdd8a890
   subdirs:
     - opt-env-conf
     - opt-env-conf-test
@@ -16,7 +16,7 @@ extra-deps:
     - safe-coloured-text-terminfo
 
 - github: NorfairKing/autodocodec
-  commit: b435803c3367b06c0d38acd90a54ba63e63fb6be
+  commit: c51eaad56acb0f9e6fa68ae7c1a14ba9dd8650c6
   subdirs:               
     - autodocodec
     - autodocodec-nix

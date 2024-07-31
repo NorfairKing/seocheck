@@ -10,6 +10,7 @@
   env: [37mROOT[m [33mURI[m
   
   [34mMinimal severity of log messages[m
+  default: [33mLevelWarn[m
   option: [37m--log-level[m [33mLOG_LEVEL[m
   
   [34mThe number of threads to fetch from. This application is usually not CPU bound so you can comfortably set this higher than the number of cores you have[m
