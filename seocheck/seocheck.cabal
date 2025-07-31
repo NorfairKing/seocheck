@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: b0510d3d7730f5b124c173df33f62e065fc0214f9a8bcc8863eb68bd4bc51cc1
+-- hash: 78b812d1a1012e213b529c16ade250f2ae48323482a8375a8df52a955e4a9b3f
 
 name:           seocheck
 version:        0.1.0.0
@@ -51,6 +51,7 @@ library
     , path
     , path-io
     , pretty-show
+    , retry
     , safe-coloured-text
     , safe-coloured-text-terminfo
     , stm

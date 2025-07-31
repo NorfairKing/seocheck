@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
@@ -13,6 +14,7 @@ import Control.Concurrent
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Logger
+import Control.Retry
 import qualified Data.ByteString as SB
 import qualified Data.ByteString.Lazy as LB
 import qualified Data.CaseInsensitive as CI
@@ -28,6 +30,8 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Validity
 import Network.HTTP.Client as HTTP
+import Network.HTTP.Client.Internal (getRedirectedRequest, httpRaw, httpRedirect)
+import Network.HTTP.Client.Internal as HTTP (toHttpException)
 import Network.HTTP.Client.TLS as HTTP
 import Network.HTTP.Types as HTTP
 import Network.URI
@@ -58,7 +62,7 @@ runSeoCheck settings@Settings {..} = do
       logDebugN $ T.pack $ ppShow settings
       logInfoN $ "Running with " <> T.pack (show fetchers) <> " fetchers"
       forConcurrently_ indexes $ \ix ->
-        worker setMaxDepth man queue seen results fetcherStati ix
+        worker setUri setMaxDepth man queue seen results fetcherStati ix
   resultsMap <- readTVarIO results
   putChunksLocale $ concat $ renderSEOResult $ SEOResult {seoResultPageResults = resultsMap}
   when (any resultBad resultsMap) $ exitWith $ ExitFailure 1
@@ -92,7 +96,7 @@ renderStatusResult s =
   ]
   where
     sci = HTTP.statusCode s
-    col = if 200 <= sci && sci < 300 then green else red
+    col = if 200 <= sci && sci < 400 then green else red
 
 renderDocResult :: DocResult -> [[Chunk]]
 renderDocResult DocResult {..} =
@@ -126,6 +130,7 @@ renderDocResult DocResult {..} =
   ]
 
 worker ::
+  URI ->
   Maybe Word ->
   HTTP.Manager ->
   TQueue Link ->
@@ -134,7 +139,7 @@ worker ::
   TVar (IntMap Bool) ->
   Int ->
   LoggingT IO ()
-worker maxDepth man queue seen results stati index = go True
+worker root maxDepth man queue seen results stati index = go True
   where
     setStatus b = atomically $ modifyTVar' stati $ IM.insert index b
     setBusy = setStatus True
@@ -153,7 +158,7 @@ worker maxDepth man queue seen results stati index = go True
           -- If all workers are idle, we are done.
           ad <- allDone
           unless ad $ do
-            liftIO $ threadDelay 10000 -- 10 ms
+            liftIO $ threadDelay 10_000 -- 10 ms
             go False
         -- An item on the queue
         Just link -> do
@@ -170,15 +175,19 @@ worker maxDepth man queue seen results stati index = go True
             else do
               -- We haven't seen it yet. Mark it as seen.
               atomically $ modifyTVar' seen $ S.insert (linkUri link)
-              mres <- produceResult maxDepth man link
-              forM_ mres $ \res -> do
-                atomically $ modifyTVar' results $ M.insert link res
-                let recurse = case maxDepth of
-                      Nothing -> True
-                      Just md -> linkDepth link < md
-                when recurse $
-                  forM_ (docResultLinks <$> resultDocResult res) $ \uris ->
-                    atomically $ mapM_ (writeTQueue queue) uris
+              errOrRes <- produceResult root maxDepth man link
+              case errOrRes of
+                Left err -> do
+                  logErrorN $ T.pack $ "Error fetching: " <> show (linkUri link) <> ":\n" <> err
+                  liftIO exitFailure
+                Right res -> do
+                  atomically $ modifyTVar' results $ M.insert link res
+                  let recurse = case maxDepth of
+                        Nothing -> True
+                        Just md -> linkDepth link < md
+                  when recurse $
+                    forM_ (docResultLinks <$> resultDocResult res) $ \uris ->
+                      atomically $ mapM_ (writeTQueue queue) uris
           -- Filter out the ones that are not on the same host.
           go True
 
@@ -206,45 +215,46 @@ resultBad Result {..} =
   not $
     validationIsValid $
       mconcat
-        [ declare "The status code is in the 200 range" $
+        [ declare "The status code is in the 200 or 300 ranges" $
             let sci = HTTP.statusCode resultStatus
-             in 200 <= sci && sci < 300,
+             in 200 <= sci && sci < 400,
           decorate "Doc result" $ maybe valid docResultValidation resultDocResult
         ]
 
-produceResult :: Maybe Word -> HTTP.Manager -> Link -> LoggingT IO (Maybe Result)
-produceResult maxDepth man link@Link {..} =
+produceResult :: URI -> Maybe Word -> HTTP.Manager -> Link -> LoggingT IO (Either String Result)
+produceResult root maxDepth man link@Link {..} =
   -- Create a request
   case requestFromURI linkUri of
-    Nothing -> do
-      logErrorN $ "Unable to construct a request from this uri: " <> T.pack (show linkUri)
-      pure Nothing
+    Nothing -> pure $ Left $ "Unable to construct a request from this uri: " <> show linkUri
     Just req -> do
       let fetchingLog = case maxDepth of
             Nothing -> ["Fetching: ", show linkUri]
             Just md -> ["Depth ", show linkDepth, "/", show md, "; Fetching: ", show linkUri]
       logInfoN $ T.pack $ concat fetchingLog
       -- Do the actual fetch
-      resp <- liftIO $ httpLbs req man
-      let status = responseStatus resp
-      let sci = HTTP.statusCode status
-      logDebugN $ "Got response for " <> T.pack (show linkUri) <> ": " <> T.pack (show sci)
-      -- If the status code is not in the 2XX range, add it to the results
-      let body = responseBody resp
-      let headers = responseHeaders resp
-          contentType = lookup hContentType headers
-      pure $
-        Just $
-          Result
-            { resultStatus = responseStatus resp,
-              resultDocResult = case linkType of
-                A -> do
-                  ct <- contentType
-                  if "text/html" `SB.isInfixOf` ct
-                    then Just $ produceDocResult link resp $ HTML.parseLBS body
-                    else Nothing
-                _ -> Nothing
-            }
+      errOrResp <- liftIO $ retryHTTP req $ httpWithRedirects root req man
+      case errOrResp of
+        Left e -> pure $ Left $ "Error fetching " <> show linkUri <> ": " <> show e
+        Right resp -> do
+          let status = responseStatus resp
+          let sci = HTTP.statusCode status
+          logDebugN $ "Got response for " <> T.pack (show linkUri) <> ": " <> T.pack (show sci)
+          -- If the status code is not in the 2XX range, add it to the results
+          let body = responseBody resp
+          let headers = responseHeaders resp
+              contentType = lookup hContentType headers
+          pure $
+            Right $
+              Result
+                { resultStatus = responseStatus resp,
+                  resultDocResult = case linkType of
+                    A -> do
+                      ct <- contentType
+                      if "text/html" `SB.isInfixOf` ct
+                        then Just $ produceDocResult link resp $ HTML.parseLBS body
+                        else Nothing
+                    _ -> Nothing
+                }
 
 data DocResult = DocResult
   { docResultLinks :: ![Link],
@@ -302,15 +312,19 @@ singleElementLink link name attrs = do
     _ -> Nothing
   let root = linkUri link
   uri <- parseURIRelativeTo root $ T.unpack t
-  -- We remove the fragment so that the same uri is not fetched twice.
+  -- We remove the fragment so that the same uri (with different fragment) is not fetched twice.
+  guard $ sameDomainPredicate root uri
   let uri' = uri {uriFragment = ""}
-  guard $ uriAuthority uri' == uriAuthority root
   pure $
     Link
       { linkType = typ,
         linkUri = uri',
         linkDepth = succ (linkDepth link)
       }
+
+sameDomainPredicate :: URI -> URI -> Bool
+sameDomainPredicate root uri =
+  uriAuthority uri == uriAuthority root
 
 nodeLinks :: Link -> Node -> [Link]
 nodeLinks link = \case
@@ -412,3 +426,58 @@ findElementTags p e@Element {..} =
     goNode = \case
       NodeElement e' -> findElementTags p e'
       _ -> []
+
+retryHTTP ::
+  -- | Just  for the error message
+  Request ->
+  IO (Response a) ->
+  IO (Either HttpException (Response a))
+retryHTTP req action =
+  let policy =
+        mconcat
+          [ exponentialBackoff 100_000,
+            limitRetries 3
+          ]
+   in retrying
+        policy
+        (\_ e -> pure (couldBeFlaky e))
+        ( \_ ->
+            (Right <$> action)
+              `catches` [ Handler $ pure . Left,
+                          Handler $ pure . Left . toHttpException req
+                        ]
+        )
+  where
+    couldBeFlaky (Left e) = case e of
+      HttpExceptionRequest _ hec -> case hec of
+        ResponseTimeout -> True
+        ConnectionTimeout -> True
+        ConnectionFailure _ -> True
+        NoResponseDataReceived -> True
+        _ -> False
+      InvalidUrlException _ _ -> False
+    couldBeFlaky _ = False
+
+httpWithRedirects :: URI -> Request -> HTTP.Manager -> IO (Response LB.ByteString)
+httpWithRedirects root request man = httpRedirect 10 go request >>= consumeBody
+  where
+    go :: HTTP.Request -> IO (Response HTTP.BodyReader, Maybe HTTP.Request)
+    go r = do
+      response <- httpRaw r man
+      pure
+        ( response,
+          do
+            newReq <-
+              getRedirectedRequest
+                request
+                r
+                (responseHeaders response)
+                (responseCookieJar response)
+                (statusCode (responseStatus response))
+            guard $ sameDomainPredicate root (getUri newReq)
+            pure newReq
+        )
+
+    consumeBody res = do
+      bss <- brConsume $ responseBody res
+      return res {responseBody = LB.fromChunks bss}

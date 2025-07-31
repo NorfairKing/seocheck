@@ -33,6 +33,7 @@ library:
     - path
     - path-io
     - pretty-show
+    - retry
     - safe-coloured-text
     - safe-coloured-text-terminfo
     - stm
