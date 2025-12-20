@@ -150,7 +150,10 @@ worker root maxDepth man queue seen results stati index = go True
     allDone :: (MonadIO m) => m Bool
     allDone = not . any snd <$> atomically (ListT.toList (StmMap.listT stati))
     go busy = do
-      mv <- timeout 10_000 $ atomically $ readTQueue queue
+      mv <-
+        if busy
+          then atomically $ tryReadTQueue queue
+          else timeout 100_000 (atomically $ readTQueue queue)
       -- Get an item off the queue
       case mv of
         -- No items on the queue
