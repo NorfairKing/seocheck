@@ -27,6 +27,7 @@ library:
     - http-client
     - http-client-tls
     - http-types
+    - list-t
     - monad-logger
     - network-uri
     - opt-env-conf
@@ -37,9 +38,11 @@ library:
     - safe-coloured-text
     - safe-coloured-text-terminfo
     - stm
+    - stm-containers
     - text
     - unliftio
     - validity
+    - validity-network-uri
     - xml-conduit
 
 executables:

@@ -1,9 +1,10 @@
 { mkDerivation, aeson, base, bytestring, case-insensitive, conduit
 , containers, html-conduit, http-client, http-client-tls
-, http-types, lib, monad-logger, network-uri, opt-env-conf
+, http-types, lib, list-t, monad-logger, network-uri, opt-env-conf
 , opt-env-conf-test, path, path-io, pretty-show, retry
-, safe-coloured-text, safe-coloured-text-terminfo, stm, sydtest
-, sydtest-discover, text, unliftio, validity, xml-conduit
+, safe-coloured-text, safe-coloured-text-terminfo, stm
+, stm-containers, sydtest, sydtest-discover, text, unliftio
+, validity, validity-network-uri, xml-conduit
 }:
 mkDerivation {
   pname = "seocheck";
@@ -13,10 +14,11 @@ mkDerivation {
   isExecutable = true;
   libraryHaskellDepends = [
     aeson base bytestring case-insensitive conduit containers
-    html-conduit http-client http-client-tls http-types monad-logger
-    network-uri opt-env-conf path path-io pretty-show retry
-    safe-coloured-text safe-coloured-text-terminfo stm text unliftio
-    validity xml-conduit
+    html-conduit http-client http-client-tls http-types list-t
+    monad-logger network-uri opt-env-conf path path-io pretty-show
+    retry safe-coloured-text safe-coloured-text-terminfo stm
+    stm-containers text unliftio validity validity-network-uri
+    xml-conduit
   ];
   executableHaskellDepends = [ base ];
   testHaskellDepends = [ base opt-env-conf-test sydtest ];

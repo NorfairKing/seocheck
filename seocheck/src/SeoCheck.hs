@@ -10,7 +10,6 @@ module SeoCheck
 where
 
 import Control.Applicative
-import Control.Concurrent
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Logger
@@ -18,8 +17,6 @@ import Control.Retry
 import qualified Data.ByteString as SB
 import qualified Data.ByteString.Lazy as LB
 import qualified Data.CaseInsensitive as CI
-import Data.IntMap (IntMap)
-import qualified Data.IntMap.Strict as IM
 import Data.List
 import Data.Map (Map)
 import qualified Data.Map as M
@@ -29,6 +26,8 @@ import qualified Data.Set as S
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Validity
+import Data.Validity.URI
+import qualified ListT
 import Network.HTTP.Client as HTTP
 import Network.HTTP.Client.Internal (getRedirectedRequest, httpRaw, httpRedirect)
 import Network.HTTP.Client.Internal as HTTP (toHttpException)
@@ -36,6 +35,8 @@ import Network.HTTP.Client.TLS as HTTP
 import Network.HTTP.Types as HTTP
 import Network.URI
 import SeoCheck.OptParse
+import qualified StmContainers.Map as StmMap
+import qualified StmContainers.Set as StmSet
 import System.Exit
 import Text.Colour
 import Text.Colour.Term
@@ -51,11 +52,13 @@ runSeoCheck :: Settings -> IO ()
 runSeoCheck settings@Settings {..} = do
   man <- HTTP.newTlsManager
   queue <- newTQueueIO
-  seen <- newTVarIO S.empty
-  results <- newTVarIO M.empty
+  seen <- StmSet.newIO
+  results <- StmMap.newIO
   let fetchers = fromMaybe 1 setFetchers
       indexes = [0 .. fetchers - 1]
-  fetcherStati <- newTVarIO $ IM.fromList $ zip indexes (repeat True)
+  fetcherStati <- StmMap.newIO
+  forM_ (zip indexes (repeat True)) $ \(ix, b) ->
+    atomically $ StmMap.insert b ix fetcherStati
   atomically $ writeTQueue queue (Link A setUri 0)
   runStderrLoggingT $
     filterLogger (\_ ll -> ll >= setLogLevel) $ do
@@ -63,20 +66,20 @@ runSeoCheck settings@Settings {..} = do
       logInfoN $ "Running with " <> T.pack (show fetchers) <> " fetchers"
       forConcurrently_ indexes $ \ix ->
         worker setUri setMaxDepth man queue seen results fetcherStati ix
-  resultsMap <- readTVarIO results
+  resultsMap <- atomically $ fmap M.fromList $ ListT.toList $ StmMap.listT results
   putChunksLocale $ concat $ renderSEOResult $ SEOResult {seoResultPageResults = resultsMap}
   when (any resultBad resultsMap) $ exitWith $ ExitFailure 1
 
 newtype SEOResult = SEOResult
-  { seoResultPageResults :: Map Link Result
+  { seoResultPageResults :: Map Text Result
   }
   deriving (Show, Eq)
 
 renderSEOResult :: SEOResult -> [[Chunk]]
 renderSEOResult SEOResult {..} = concat $ mapMaybe (uncurry renderPageResult) (M.toList seoResultPageResults)
 
-renderPageResult :: Link -> Result -> Maybe [[Chunk]]
-renderPageResult link r@Result {..} =
+renderPageResult :: Text -> Result -> Maybe [[Chunk]]
+renderPageResult uriText r@Result {..} =
   if resultBad r
     then Just go
     else Nothing
@@ -84,7 +87,7 @@ renderPageResult link r@Result {..} =
     go :: [[Chunk]]
     go =
       intersperse [chunk "\n"] $
-        [ [fore blue $ chunk $ T.pack $ show (linkUri link)],
+        [ [fore blue $ chunk uriText],
           renderStatusResult resultStatus
         ]
           ++ maybe [] renderDocResult resultDocResult
@@ -134,39 +137,43 @@ worker ::
   Maybe Word ->
   HTTP.Manager ->
   TQueue Link ->
-  TVar (Set URI) ->
-  TVar (Map Link Result) ->
-  TVar (IntMap Bool) ->
+  StmSet.Set Text ->
+  StmMap.Map Text Result ->
+  StmMap.Map Int Bool ->
   Int ->
   LoggingT IO ()
 worker root maxDepth man queue seen results stati index = go True
   where
-    setStatus b = atomically $ modifyTVar' stati $ IM.insert index b
+    setStatus b = atomically $ StmMap.insert b index stati
     setBusy = setStatus True
     setIdle = setStatus False
     allDone :: (MonadIO m) => m Bool
-    allDone = all not <$> readTVarIO stati
+    allDone = not . any snd <$> atomically (ListT.toList (StmMap.listT stati))
     go busy = do
-      mv <- atomically $ tryReadTQueue queue
+      mv <- timeout 10_000 $ atomically $ readTQueue queue
       -- Get an item off the queue
       case mv of
         -- No items on the queue
         Nothing -> do
           -- Set this worker as idle
-          logDebugN $ "Worker is idle: " <> T.pack (show index)
+          logDebugN $
+            T.pack $
+              unwords
+                [ "Worker is idle:",
+                  show index
+                ]
           when busy setIdle
           -- If all workers are idle, we are done.
           ad <- allDone
-          unless ad $ do
-            liftIO $ threadDelay 10_000 -- 10 ms
-            go False
+          unless ad $ go False
         -- An item on the queue
         Just link -> do
           -- Set this worker as busy
           logDebugN $ "Worker is busy: " <> T.pack (show index)
           unless busy setBusy
           -- Check if the link has been seen already
-          alreadySeen <- S.member (linkUri link) <$> readTVarIO seen
+          let linkText = T.pack $ dangerousURIToString $ linkUri link
+          alreadySeen <- atomically $ StmSet.lookup linkText seen
           if alreadySeen
             then do
               -- We've already seen it, don't do anything.
@@ -174,14 +181,14 @@ worker root maxDepth man queue seen results stati index = go True
               pure ()
             else do
               -- We haven't seen it yet. Mark it as seen.
-              atomically $ modifyTVar' seen $ S.insert (linkUri link)
+              atomically $ StmSet.insert linkText seen
               errOrRes <- produceResult root maxDepth man link
               case errOrRes of
                 Left err -> do
                   logErrorN $ T.pack $ "Error fetching: " <> show (linkUri link) <> ":\n" <> err
                   liftIO exitFailure
                 Right res -> do
-                  atomically $ modifyTVar' results $ M.insert link res
+                  atomically $ StmMap.insert res linkText results
                   let recurse = case maxDepth of
                         Nothing -> True
                         Just md -> linkDepth link < md
