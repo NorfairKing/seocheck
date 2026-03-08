@@ -135,6 +135,12 @@ renderDocResult DocResult {..} =
         EmptyCanonical -> fore red $ chunk "Empty canonical"
         NoCanonical -> fore red $ chunk "No canonical"
     ],
+    [ chunk "H1: ",
+      case docResultH1 of
+        OneH1 -> fore green $ chunk "One"
+        NoH1 -> fore red $ chunk "None"
+        MultipleH1 n -> fore red $ chunk $ T.pack $ show n <> " h1 tags"
+    ],
     [chunk "\n"] -- Empty line
   ]
 
@@ -278,7 +284,8 @@ data DocResult = DocResult
     docResultTitle :: !TitleResult,
     docResultDescription :: !DescriptionResult,
     docResultImagesWithoutAlt :: !(Set Text), -- The 'src' tags of those images
-    docResultCanonical :: !CanonicalResult
+    docResultCanonical :: !CanonicalResult,
+    docResultH1 :: !H1Result
   }
   deriving (Show, Eq)
 
@@ -299,6 +306,9 @@ docResultValidation DocResult {..} =
       declare "There are no pages without alt tags" $ S.null docResultImagesWithoutAlt,
       declare "There was a canonical link" $ case docResultCanonical of
         CanonicalFound _ -> True
+        _ -> False,
+      declare "There was exactly one h1" $ case docResultH1 of
+        OneH1 -> True
         _ -> False
     ]
 
@@ -310,7 +320,8 @@ produceDocResult link resp d =
       docResultTitle = documentTitle d,
       docResultDescription = documentDescription d,
       docResultImagesWithoutAlt = documentImagesWithoutAlt d,
-      docResultCanonical = documentCanonical d
+      docResultCanonical = documentCanonical d,
+      docResultH1 = documentH1 d
     }
 
 documentLinks :: Link -> Document -> [Link]
@@ -429,6 +440,19 @@ documentCanonical d =
               Nothing -> EmptyCanonical
               Just "" -> EmptyCanonical
               Just href -> CanonicalFound href
+
+data H1Result
+  = NoH1
+  | OneH1
+  | MultipleH1 Int
+  deriving (Show, Eq)
+
+documentH1 :: Document -> H1Result
+documentH1 d =
+  case length (findDocumentTags (== "h1") d) of
+    0 -> NoH1
+    1 -> OneH1
+    n -> MultipleH1 n
 
 findDocumentTag :: (Name -> Bool) -> Document -> Maybe Element
 findDocumentTag p = findElementTag p . documentRoot
