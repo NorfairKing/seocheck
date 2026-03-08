@@ -141,6 +141,12 @@ renderDocResult DocResult {..} =
         NoH1 -> fore red $ chunk "None"
         MultipleH1 n -> fore red $ chunk $ T.pack $ show n <> " h1 tags"
     ],
+    [ chunk "Lang: ",
+      case docResultLang of
+        LangFound l -> fore green $ chunk l
+        EmptyLang -> fore red $ chunk "Empty lang"
+        NoLang -> fore red $ chunk "No lang"
+    ],
     [chunk "\n"] -- Empty line
   ]
 
@@ -285,7 +291,8 @@ data DocResult = DocResult
     docResultDescription :: !DescriptionResult,
     docResultImagesWithoutAlt :: !(Set Text), -- The 'src' tags of those images
     docResultCanonical :: !CanonicalResult,
-    docResultH1 :: !H1Result
+    docResultH1 :: !H1Result,
+    docResultLang :: !LangResult
   }
   deriving (Show, Eq)
 
@@ -309,6 +316,9 @@ docResultValidation DocResult {..} =
         _ -> False,
       declare "There was exactly one h1" $ case docResultH1 of
         OneH1 -> True
+        _ -> False,
+      declare "There was a lang attribute" $ case docResultLang of
+        LangFound _ -> True
         _ -> False
     ]
 
@@ -321,7 +331,8 @@ produceDocResult link resp d =
       docResultDescription = documentDescription d,
       docResultImagesWithoutAlt = documentImagesWithoutAlt d,
       docResultCanonical = documentCanonical d,
-      docResultH1 = documentH1 d
+      docResultH1 = documentH1 d,
+      docResultLang = documentLang d
     }
 
 documentLinks :: Link -> Document -> [Link]
@@ -453,6 +464,20 @@ documentH1 d =
     0 -> NoH1
     1 -> OneH1
     n -> MultipleH1 n
+
+data LangResult
+  = NoLang
+  | EmptyLang
+  | LangFound Text
+  deriving (Show, Eq)
+
+documentLang :: Document -> LangResult
+documentLang d =
+  let root = documentRoot d
+   in case M.lookup "lang" (elementAttributes root) of
+        Nothing -> NoLang
+        Just "" -> EmptyLang
+        Just lang -> if T.null (T.strip lang) then EmptyLang else LangFound lang
 
 findDocumentTag :: (Name -> Bool) -> Document -> Maybe Element
 findDocumentTag p = findElementTag p . documentRoot
