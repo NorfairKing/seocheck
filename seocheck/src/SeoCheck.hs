@@ -67,16 +67,71 @@ runSeoCheck settings@Settings {..} = do
       forConcurrently_ indexes $ \ix ->
         worker setUri setMaxDepth man queue seen results fetcherStati ix
   resultsMap <- atomically $ fmap M.fromList $ ListT.toList $ StmMap.listT results
-  putChunksLocale $ concat $ renderSEOResult $ SEOResult {seoResultPageResults = resultsMap}
-  when (any resultBad resultsMap) $ exitWith $ ExitFailure 1
+  let seoResult = SEOResult {seoResultPageResults = resultsMap}
+  putChunksLocale $ concat $ renderSEOResult seoResult
+  when (seoResultBad seoResult) $ exitWith $ ExitFailure 1
 
 newtype SEOResult = SEOResult
   { seoResultPageResults :: Map Text Result
   }
   deriving (Show, Eq)
 
+seoResultBad :: SEOResult -> Bool
+seoResultBad SEOResult {..} =
+  any resultBad seoResultPageResults
+    || not (null (duplicateTitles seoResultPageResults))
+    || not (null (duplicateDescriptions seoResultPageResults))
+
 renderSEOResult :: SEOResult -> [[Chunk]]
-renderSEOResult SEOResult {..} = concat $ mapMaybe (uncurry renderPageResult) (M.toList seoResultPageResults)
+renderSEOResult seoResult@SEOResult {..} =
+  concat (mapMaybe (uncurry renderPageResult) (M.toList seoResultPageResults))
+    ++ renderDuplicates seoResult
+
+duplicateTitles :: Map Text Result -> Map Text [Text]
+duplicateTitles =
+  M.filter (\urls -> length urls > 1)
+    . M.foldlWithKey'
+      ( \acc uri result ->
+          case resultDocResult result >>= titleText . docResultTitle of
+            Nothing -> acc
+            Just t -> M.insertWith (++) t [uri] acc
+      )
+      M.empty
+  where
+    titleText (TitleFound t) = Just t
+    titleText _ = Nothing
+
+duplicateDescriptions :: Map Text Result -> Map Text [Text]
+duplicateDescriptions =
+  M.filter (\urls -> length urls > 1)
+    . M.foldlWithKey'
+      ( \acc uri result ->
+          case resultDocResult result >>= descriptionText . docResultDescription of
+            Nothing -> acc
+            Just d -> M.insertWith (++) d [uri] acc
+      )
+      M.empty
+  where
+    descriptionText (Description d) = Just d
+    descriptionText _ = Nothing
+
+renderDuplicates :: SEOResult -> [[Chunk]]
+renderDuplicates SEOResult {..} =
+  renderDuplicateGroup "Duplicate titles" (duplicateTitles seoResultPageResults)
+    ++ renderDuplicateGroup "Duplicate descriptions" (duplicateDescriptions seoResultPageResults)
+
+renderDuplicateGroup :: Text -> Map Text [Text] -> [[Chunk]]
+renderDuplicateGroup label dupes
+  | M.null dupes = []
+  | otherwise =
+      [[fore red $ chunk label]]
+        ++ concatMap
+          ( \(value, urls) ->
+              [chunk "  ", fore yellow $ chunk value]
+                : map (\u -> [chunk "    ", chunk u]) urls
+          )
+          (M.toList dupes)
+        ++ [[chunk "\n"]]
 
 renderPageResult :: Text -> Result -> Maybe [[Chunk]]
 renderPageResult uriText r@Result {..} =
