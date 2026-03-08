@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 17f46b5c4fd679953895b36e6c68540bc0155011ff1710a7111bde1efdc7c5b1
+-- hash: 8c169393c6db04a78ed502169528ba14db770c0c09e3161e9157de43e70ad0ce
 
 name:           seocheck
 version:        0.1.0.0
@@ -35,11 +35,9 @@ library
   hs-source-dirs:
       src
   build-depends:
-      aeson
-    , base >=4.7 && <5
+      base >=4.7 && <5
     , bytestring
     , case-insensitive
-    , conduit
     , containers
     , html-conduit
     , http-client
@@ -49,13 +47,10 @@ library
     , monad-logger
     , network-uri
     , opt-env-conf
-    , path
-    , path-io
     , pretty-show
     , retry
     , safe-coloured-text
     , safe-coloured-text-terminfo
-    , stm
     , stm-containers
     , text
     , unliftio

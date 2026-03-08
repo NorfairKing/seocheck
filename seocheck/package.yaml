@@ -18,10 +18,8 @@ dependencies:
 library:
   source-dirs: src
   dependencies:
-    - aeson
     - bytestring
     - case-insensitive
-    - conduit
     - containers
     - html-conduit
     - http-client
@@ -31,13 +29,10 @@ library:
     - monad-logger
     - network-uri
     - opt-env-conf
-    - path
-    - path-io
     - pretty-show
     - retry
     - safe-coloured-text
     - safe-coloured-text-terminfo
-    - stm
     - stm-containers
     - text
     - unliftio

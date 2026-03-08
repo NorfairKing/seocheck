@@ -129,6 +129,12 @@ renderDocResult DocResult {..} =
         [] -> fore green $ chunk "None"
         is -> fore red $ chunk $ T.pack $ show is
     ],
+    [ chunk "Canonical: ",
+      case docResultCanonical of
+        CanonicalFound c -> fore green $ chunk c
+        EmptyCanonical -> fore red $ chunk "Empty canonical"
+        NoCanonical -> fore red $ chunk "No canonical"
+    ],
     [chunk "\n"] -- Empty line
   ]
 
@@ -271,7 +277,8 @@ data DocResult = DocResult
     docResultDocType :: !DocTypeResult,
     docResultTitle :: !TitleResult,
     docResultDescription :: !DescriptionResult,
-    docResultImagesWithoutAlt :: !(Set Text) -- The 'src' tags of those images
+    docResultImagesWithoutAlt :: !(Set Text), -- The 'src' tags of those images
+    docResultCanonical :: !CanonicalResult
   }
   deriving (Show, Eq)
 
@@ -289,7 +296,10 @@ docResultValidation DocResult {..} =
         case docResultDescription of
           Description _ -> True
           _ -> False,
-      declare "There are no pages without alt tags" $ S.null docResultImagesWithoutAlt
+      declare "There are no pages without alt tags" $ S.null docResultImagesWithoutAlt,
+      declare "There was a canonical link" $ case docResultCanonical of
+        CanonicalFound _ -> True
+        _ -> False
     ]
 
 produceDocResult :: Link -> Response LB.ByteString -> XML.Document -> DocResult
@@ -299,7 +309,8 @@ produceDocResult link resp d =
       docResultDocType = documentDocType resp,
       docResultTitle = documentTitle d,
       docResultDescription = documentDescription d,
-      docResultImagesWithoutAlt = documentImagesWithoutAlt d
+      docResultImagesWithoutAlt = documentImagesWithoutAlt d,
+      docResultCanonical = documentCanonical d
     }
 
 documentLinks :: Link -> Document -> [Link]
@@ -398,6 +409,26 @@ documentDescription d =
               [] -> maybe EmptyDescription Description $ M.lookup "content" (elementAttributes e)
               _ -> NonStandardDescription e
             _ -> MultipleDescriptions
+
+data CanonicalResult
+  = NoCanonical
+  | EmptyCanonical
+  | CanonicalFound Text
+  deriving (Show, Eq)
+
+documentCanonical :: Document -> CanonicalResult
+documentCanonical d =
+  case findDocumentTag (== "head") d of
+    Nothing -> NoCanonical
+    Just headTag ->
+      let linkTags = findElementTags (== "link") headTag
+          isCanonical e = M.lookup "rel" (elementAttributes e) == Just "canonical"
+       in case filter isCanonical linkTags of
+            [] -> NoCanonical
+            (e : _) -> case M.lookup "href" (elementAttributes e) of
+              Nothing -> EmptyCanonical
+              Just "" -> EmptyCanonical
+              Just href -> CanonicalFound href
 
 findDocumentTag :: (Name -> Bool) -> Document -> Maybe Element
 findDocumentTag p = findElementTag p . documentRoot
