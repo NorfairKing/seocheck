@@ -87,14 +87,27 @@ renderSEOResult seoResult@SEOResult {..} =
   concat (mapMaybe (uncurry renderPageResult) (M.toList seoResultPageResults))
     ++ renderDuplicates seoResult
 
+-- | Get the canonical identity of a page. If the page has a canonical link,
+-- use that; otherwise use the request URI. This ensures that pages which
+-- redirect to the same canonical URL are not counted as duplicates.
+pageIdentity :: Text -> Result -> Text
+pageIdentity uri result =
+  fromMaybe uri (resultDocResult result >>= canonicalText . docResultCanonical)
+  where
+    canonicalText (CanonicalFound c) = Just c
+    canonicalText _ = Nothing
+
 duplicateTitles :: Map Text Result -> Map Text [Text]
 duplicateTitles =
-  M.filter (\urls -> length urls > 1)
+  M.map S.toList
+    . M.filter (\urls -> S.size urls > 1)
     . M.foldlWithKey'
       ( \acc uri result ->
           case resultDocResult result >>= titleText . docResultTitle of
             Nothing -> acc
-            Just t -> M.insertWith (++) t [uri] acc
+            Just t ->
+              let identity = pageIdentity uri result
+               in M.insertWith S.union t (S.singleton identity) acc
       )
       M.empty
   where
@@ -103,12 +116,15 @@ duplicateTitles =
 
 duplicateDescriptions :: Map Text Result -> Map Text [Text]
 duplicateDescriptions =
-  M.filter (\urls -> length urls > 1)
+  M.map S.toList
+    . M.filter (\urls -> S.size urls > 1)
     . M.foldlWithKey'
       ( \acc uri result ->
           case resultDocResult result >>= descriptionText . docResultDescription of
             Nothing -> acc
-            Just d -> M.insertWith (++) d [uri] acc
+            Just d ->
+              let identity = pageIdentity uri result
+               in M.insertWith S.union d (S.singleton identity) acc
       )
       M.empty
   where
