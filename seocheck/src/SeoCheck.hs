@@ -59,7 +59,7 @@ runSeoCheck settings@Settings {..} = do
   fetcherStati <- StmMap.newIO
   forM_ (zip indexes (repeat True)) $ \(ix, b) ->
     atomically $ StmMap.insert b ix fetcherStati
-  atomically $ writeTQueue queue (Link A setUri 0)
+  atomically $ writeTQueue queue (Link A (normalizeURI setUri) 0)
   runStderrLoggingT $
     filterLogger (\_ ll -> ll >= setLogLevel) $ do
       logDebugN $ T.pack $ ppShow settings
@@ -412,13 +412,19 @@ singleElementLink link name attrs = do
   uri <- parseURIRelativeTo root $ T.unpack t
   -- We remove the fragment so that the same uri (with different fragment) is not fetched twice.
   guard $ sameDomainPredicate root uri
-  let uri' = uri {uriFragment = ""}
+  let uri' = normalizeURI uri {uriFragment = ""}
   pure $
     Link
       { linkType = typ,
         linkUri = uri',
         linkDepth = succ (linkDepth link)
       }
+
+-- | Normalize a URI so that equivalent URIs are treated as equal.
+-- In particular, an empty path is treated as "/".
+normalizeURI :: URI -> URI
+normalizeURI uri =
+  uri {uriPath = if null (uriPath uri) then "/" else uriPath uri}
 
 sameDomainPredicate :: URI -> URI -> Bool
 sameDomainPredicate root uri =
